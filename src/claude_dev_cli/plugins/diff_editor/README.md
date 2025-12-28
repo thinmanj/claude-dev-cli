@@ -9,7 +9,10 @@ Interactive diff viewer for reviewing code changes with support for multiple key
   - **Neovim mode**: Familiar vim-style keybindings (j/k, y/n, etc.)
   - **Fresh mode**: Modern editor keybindings (arrows, Enter, etc.)
   - **Auto mode**: Detects preference from `$EDITOR` or `$VISUAL`
-- **Syntax highlighting**: Color-coded diff display using Rich
+- **Syntax highlighting**: Auto-detects language and applies syntax coloring via Pygments
+- **Edit mode**: Open hunks in your `$EDITOR` for inline modifications before accepting
+- **Split mode**: Break large hunks into smaller, line-by-line chunks for granular review
+- **Undo support**: Undo accept/reject decisions with full history tracking
 - **Smart context**: Shows relevant code context for each change
 
 ## Usage
@@ -40,10 +43,13 @@ cdc diff original.py proposed.py -o final.py
 |--------|------|
 | Accept hunk | `y`, `a` |
 | Reject hunk | `n`, `d` |
+| Edit hunk | `e`, `c` |
+| Split hunk | `s` |
 | Next hunk | `j`, `n` |
 | Previous hunk | `k`, `p` |
 | Accept all remaining | `A` |
 | Reject all remaining | `D` |
+| Undo | `u` |
 | Quit | `q`, `ZZ` |
 | Help | `?`, `h` |
 
@@ -53,10 +59,13 @@ cdc diff original.py proposed.py -o final.py
 |--------|------|
 | Accept hunk | `y`, `Enter` |
 | Reject hunk | `n`, `Backspace` |
+| Edit hunk | `e` |
+| Split hunk | `s` |
 | Next hunk | `↓`, `j` |
 | Previous hunk | `↑`, `k` |
 | Accept all remaining | `Ctrl-A` |
 | Reject all remaining | `Ctrl-R` |
+| Undo | `Ctrl-Z` |
 | Quit | `q`, `Esc` |
 | Help | `F1`, `?` |
 
@@ -72,8 +81,12 @@ cdc diff original.py proposed.py -o final.py
 
 1. **Diff Generation**: Uses Python's `difflib.Differ` to compare files line-by-line
 2. **Hunk Creation**: Groups consecutive changes into logical hunks
-3. **Interactive Review**: Displays each hunk with original/proposed views
-4. **Change Application**: Applies only accepted hunks to produce final output
+3. **Syntax Detection**: Auto-detects language from filename using Pygments lexers
+4. **Interactive Review**: Displays each hunk with syntax-highlighted code
+5. **Edit Mode**: Opens temp file in `$EDITOR` for inline modifications
+6. **Split Mode**: Breaks hunks into line-by-line pieces for finer control
+7. **History Tracking**: Maintains undo stack of all accept/reject decisions
+8. **Change Application**: Applies only accepted hunks to produce final output
 
 ### Integration with Main CLI
 
@@ -90,9 +103,9 @@ def register_commands(self, cli: click.Group) -> None:
 
 ## Future Enhancements
 
-- **Edit mode**: Inline editing of hunks before accepting
-- **Split mode**: Split large hunks into smaller pieces
-- **Undo support**: Undo accept/reject decisions
 - **Side-by-side view**: Full TUI with split panes using `prompt_toolkit`
 - **Integration with AI workflows**: Auto-apply Claude suggestions with review
 - **Syntax-aware hunks**: Smart hunk boundaries based on code structure
+- **Advanced split modes**: Split by function, class, or semantic blocks
+- **Merge conflict resolution**: Use diff editor for resolving git conflicts
+- **Batch operations**: Apply same decision to similar hunks across files

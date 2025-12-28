@@ -1,6 +1,8 @@
 """Interactive diff viewer with multiple keybinding modes."""
 
 import difflib
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 import os
@@ -271,6 +273,77 @@ class DiffViewer:
         
         self.console.print(prompt)
     
+    def _edit_hunk(self, hunk: Hunk) -> Optional[List[str]]:
+        """Open hunk in editor for inline editing.
+        
+        Returns:
+            Edited lines or None if cancelled
+        """
+        # Get editor from environment
+        editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "nano"))
+        
+        # Create temp file with proposed lines
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tmp", delete=False) as f:
+            f.write("".join(hunk.proposed_lines))
+            temp_path = f.name
+        
+        try:
+            # Open in editor
+            result = subprocess.run([editor, temp_path])
+            
+            if result.returncode == 0:
+                # Read edited content
+                with open(temp_path) as f:
+                    content = f.read()
+                return content.splitlines(keepends=True)
+            else:
+                self.console.print("[yellow]Edit cancelled[/yellow]")
+                return None
+        finally:
+            # Clean up temp file
+            Path(temp_path).unlink(missing_ok=True)
+    
+    def _split_hunk(self, hunk: Hunk, hunk_idx: int) -> None:
+        """Split a hunk into smaller hunks.
+        
+        For now, splits by line - each line becomes its own hunk.
+        More advanced splitting could be added later.
+        """
+        if len(hunk.proposed_lines) <= 1 and len(hunk.original_lines) <= 1:
+            self.console.print("[yellow]Hunk is too small to split[/yellow]")
+            return
+        
+        new_hunks = []
+        
+        # Split proposed lines into individual hunks
+        if hunk.proposed_lines:
+            for i, line in enumerate(hunk.proposed_lines):
+                new_hunks.append(Hunk(
+                    original_lines=[],
+                    proposed_lines=[line],
+                    original_start=hunk.original_start,
+                    proposed_start=hunk.proposed_start + i
+                ))
+        
+        # Split original lines into deletions
+        if hunk.original_lines and not hunk.proposed_lines:
+            for i, line in enumerate(hunk.original_lines):
+                new_hunks.append(Hunk(
+                    original_lines=[line],
+                    proposed_lines=[],
+                    original_start=hunk.original_start + i,
+                    proposed_start=hunk.proposed_start
+                ))
+        
+        if new_hunks:
+            # Replace current hunk with split hunks
+            self.hunks = (
+                self.hunks[:hunk_idx] +
+                new_hunks +
+                self.hunks[hunk_idx + 1:]
+            )
+            self.console.print(f"[green]✓ Split into {len(new_hunks)} hunks[/green]")
+    
     def run(self) -> Optional[str]:
         """Run the interactive diff viewer.
         
@@ -306,10 +379,20 @@ class DiffViewer:
                 hunk.accepted = False
                 self.current_hunk_idx += 1
             elif choice in kb["edit"]:
-                self.console.print("[yellow]Edit mode not yet implemented[/yellow]")
-                self.console.input("Press Enter to continue...")
+                # Enter edit mode for this hunk
+                edited_lines = self._edit_hunk(hunk)
+                if edited_lines is not None:
+                    # Save history
+                    self.history.append((self.current_hunk_idx, hunk.accepted))
+                    # Update hunk with edited content
+                    hunk.proposed_lines = edited_lines
+                    hunk.accepted = True
+                    self.console.print("[green]✓ Hunk updated with edits[/green]")
+                    self.console.input("Press Enter to continue...")
+                    self.current_hunk_idx += 1
             elif choice in kb["split"]:
-                self.console.print("[yellow]Split mode not yet implemented[/yellow]")
+                # Split current hunk
+                self._split_hunk(hunk, self.current_hunk_idx)
                 self.console.input("Press Enter to continue...")
             elif choice in kb["next"]:
                 if self.current_hunk_idx < len(self.hunks) - 1:
