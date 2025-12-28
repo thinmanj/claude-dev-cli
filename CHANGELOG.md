@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2024-12-28
+
+### Added
+- Syntax highlighting in diff editor using Pygments (auto-detects language)
+- Undo support in diff editor with history stack
+- Optional `plugins` dependency group for enhanced features
+
+### Fixed
+- All test failures resolved (98/98 tests passing)
+- Config class now respects HOME environment variable for test isolation
+- API routing hierarchy properly prioritizes explicit flags over project profiles
+
 ## [0.3.0] - 2024-12-28
 
 ### Added
