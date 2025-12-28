@@ -28,15 +28,15 @@ class ProjectProfile(BaseModel):
 class Config:
     """Manages configuration for Claude Dev CLI."""
     
-    CONFIG_DIR = Path.home() / ".claude-dev-cli"
-    CONFIG_FILE = CONFIG_DIR / "config.json"
-    USAGE_LOG = CONFIG_DIR / "usage.jsonl"
-    
     def __init__(self) -> None:
         """Initialize configuration."""
-        self.config_dir = self.CONFIG_DIR
-        self.config_file = self.CONFIG_FILE
-        self.usage_log = self.USAGE_LOG
+        # Determine home directory (respects HOME env var for testing)
+        home = Path(os.environ.get("HOME", str(Path.home())))
+        
+        self.config_dir = home / ".claude-dev-cli"
+        self.config_file = self.config_dir / "config.json"
+        self.usage_log = self.config_dir / "usage.jsonl"
+        
         self._ensure_config_dir()
         self._data: Dict = self._load_config()
     

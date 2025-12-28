@@ -13,13 +13,21 @@ class ClaudeClient:
     """Claude API client with multi-key routing and usage tracking."""
     
     def __init__(self, config: Optional[Config] = None, api_config_name: Optional[str] = None):
-        """Initialize Claude client."""
+        """Initialize Claude client.
+        
+        API routing hierarchy (highest to lowest priority):
+        1. Explicit api_config_name parameter
+        2. Project-specific .claude-dev-cli file
+        3. Default API config
+        """
         self.config = config or Config()
         
-        # Determine which API config to use
-        project_profile = self.config.get_project_profile()
-        if project_profile:
-            api_config_name = project_profile.api_config
+        # Determine which API config to use based on hierarchy
+        if not api_config_name:
+            # Check for project profile if no explicit config provided
+            project_profile = self.config.get_project_profile()
+            if project_profile:
+                api_config_name = project_profile.api_config
         
         self.api_config = self.config.get_api_config(api_config_name)
         if not self.api_config:
