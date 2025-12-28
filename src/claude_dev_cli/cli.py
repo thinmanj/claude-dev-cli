@@ -1,5 +1,6 @@
 """Command-line interface for Claude Dev CLI."""
 
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -148,6 +149,77 @@ def interactive(ctx: click.Context, api: Optional[str]) -> None:
     
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
+def completion() -> None:
+    """Shell completion installation."""
+    pass
+
+
+@completion.command('install')
+@click.option('--shell', type=click.Choice(['bash', 'zsh', 'fish', 'auto']), default='auto',
+              help='Shell type (auto-detects if not specified)')
+@click.pass_context
+def completion_install(ctx: click.Context, shell: str) -> None:
+    """Install shell completion for cdc command."""
+    console = ctx.obj['console']
+    
+    # Auto-detect shell if needed
+    if shell == 'auto':
+        shell_path = os.environ.get('SHELL', '')
+        if 'zsh' in shell_path:
+            shell = 'zsh'
+        elif 'bash' in shell_path:
+            shell = 'bash'
+        elif 'fish' in shell_path:
+            shell = 'fish'
+        else:
+            console.print("[red]Could not auto-detect shell[/red]")
+            console.print("Please specify: --shell bash|zsh|fish")
+            sys.exit(1)
+    
+    console.print(f"[cyan]Installing completion for {shell}...[/cyan]\n")
+    
+    if shell == 'zsh':
+        console.print("Add this to your ~/.zshrc:\n")
+        console.print("[yellow]eval \"$(_CDC_COMPLETE=zsh_source cdc)\"[/yellow]\n")
+        console.print("Then run: [cyan]source ~/.zshrc[/cyan]")
+    elif shell == 'bash':
+        console.print("Add this to your ~/.bashrc:\n")
+        console.print("[yellow]eval \"$(_CDC_COMPLETE=bash_source cdc)\"[/yellow]\n")
+        console.print("Then run: [cyan]source ~/.bashrc[/cyan]")
+    elif shell == 'fish':
+        console.print("Add this to ~/.config/fish/completions/cdc.fish:\n")
+        console.print("[yellow]_CDC_COMPLETE=fish_source cdc | source[/yellow]\n")
+        console.print("Then reload: [cyan]exec fish[/cyan]")
+    
+    console.print("\n[green]✓[/green] Instructions displayed above")
+    console.print("[dim]Completion will provide command and option suggestions[/dim]")
+
+
+@completion.command('generate')
+@click.option('--shell', type=click.Choice(['bash', 'zsh', 'fish']), required=True,
+              help='Shell type')
+@click.pass_context
+def completion_generate(ctx: click.Context, shell: str) -> None:
+    """Generate completion script for shell."""
+    import subprocess
+    import sys
+    
+    env_var = f"_CDC_COMPLETE={shell}_source"
+    result = subprocess.run(
+        [sys.executable, '-m', 'claude_dev_cli.cli'],
+        env={**os.environ, '_CDC_COMPLETE': f'{shell}_source'},
+        capture_output=True,
+        text=True
+    )
+    
+    if result.returncode == 0:
+        click.echo(result.stdout)
+    else:
+        ctx.obj['console'].print(f"[red]Error generating completion: {result.stderr}[/red]")
         sys.exit(1)
 
 
