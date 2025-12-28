@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, Optional, List
 from pydantic import BaseModel, Field
 
+from claude_dev_cli.secure_storage import SecureStorage
+
 
 class APIConfig(BaseModel):
     """Configuration for a Claude API key."""
@@ -39,6 +41,12 @@ class Config:
         
         self._ensure_config_dir()
         self._data: Dict = self._load_config()
+        
+        # Initialize secure storage
+        self.secure_storage = SecureStorage(self.config_dir)
+        
+        # Auto-migrate if plaintext keys exist
+        self._auto_migrate_keys()
     
     def _ensure_config_dir(self) -> None:
         """Ensure configuration directory exists."""
@@ -68,6 +76,22 @@ class Config:
         with open(self.config_file, 'w') as f:
             json.dump(data, f, indent=2)
     
+    def _auto_migrate_keys(self) -> None:
+        """Automatically migrate plaintext API keys to secure storage."""
+        api_configs = self._data.get("api_configs", [])
+        migrated = False
+        
+        for config in api_configs:
+            if "api_key" in config and config["api_key"]:
+                # Migrate this key to secure storage
+                self.secure_storage.store_key(config["name"], config["api_key"])
+                # Remove from plaintext config
+                config["api_key"] = ""  # Empty string indicates key is in secure storage
+                migrated = True
+        
+        if migrated:
+            self._save_config()
+    
     def add_api_config(
         self,
         name: str,
@@ -91,14 +115,18 @@ class Config:
             if config["name"] == name:
                 raise ValueError(f"API config with name '{name}' already exists")
         
+        # Store API key in secure storage
+        self.secure_storage.store_key(name, api_key)
+        
         # If this is the first config or make_default is True, set as default
         if make_default or not api_configs:
             for config in api_configs:
                 config["default"] = False
         
+        # Store metadata without the actual key (empty string indicates secure storage)
         api_config = APIConfig(
             name=name,
-            api_key=api_key,
+            api_key="",  # Empty string indicates key is in secure storage
             description=description,
             default=make_default or not api_configs
         )
@@ -111,21 +139,53 @@ class Config:
         """Get API configuration by name or default."""
         api_configs = self._data.get("api_configs", [])
         
+        config_data = None
         if name:
             for config in api_configs:
                 if config["name"] == name:
-                    return APIConfig(**config)
+                    config_data = config
+                    break
         else:
             # Return default
             for config in api_configs:
                 if config.get("default", False):
-                    return APIConfig(**config)
+                    config_data = config
+                    break
         
-        return None
+        if not config_data:
+            return None
+        
+        # Retrieve actual API key from secure storage
+        api_key = self.secure_storage.get_key(config_data["name"])
+        if not api_key:
+            # Fallback to plaintext if not in secure storage (shouldn't happen after migration)
+            api_key = config_data.get("api_key", "")
+        
+        # Return config with actual key
+        return APIConfig(
+            name=config_data["name"],
+            api_key=api_key,
+            description=config_data.get("description"),
+            default=config_data.get("default", False)
+        )
     
     def list_api_configs(self) -> List[APIConfig]:
         """List all API configurations."""
-        return [APIConfig(**c) for c in self._data.get("api_configs", [])]
+        configs = []
+        for c in self._data.get("api_configs", []):
+            # Retrieve actual API key from secure storage
+            api_key = self.secure_storage.get_key(c["name"])
+            if not api_key:
+                # Fallback to plaintext
+                api_key = c.get("api_key", "")
+            
+            configs.append(APIConfig(
+                name=c["name"],
+                api_key=api_key,
+                description=c.get("description"),
+                default=c.get("default", False)
+            ))
+        return configs
     
     def add_project_profile(
         self,
