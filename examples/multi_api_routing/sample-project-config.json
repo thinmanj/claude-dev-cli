@@ -1,0 +1,6 @@
+{
+  "name": "Sample Project",
+  "api_config": "client",
+  "system_prompt": "You are a senior Python developer with expertise in web development, testing, and security best practices.",
+  "allowed_commands": ["all"]
+}

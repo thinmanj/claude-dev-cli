@@ -1,0 +1,61 @@
+{
+  "employees": [
+    {
+      "id": 1001,
+      "name": "Alice Johnson",
+      "department": "Engineering",
+      "salary": 95000,
+      "hire_date": "2020-03-15",
+      "skills": ["Python", "Docker", "AWS"]
+    },
+    {
+      "id": 1002,
+      "name": "Bob Smith",
+      "department": "Engineering",
+      "salary": 88000,
+      "hire_date": "2021-06-01",
+      "skills": ["JavaScript", "React", "Node.js"]
+    },
+    {
+      "id": 1003,
+      "name": "Carol Williams",
+      "department": "Marketing",
+      "salary": 72000,
+      "hire_date": "2019-11-20",
+      "skills": ["SEO", "Content Marketing", "Analytics"]
+    },
+    {
+      "id": 1004,
+      "name": "David Brown",
+      "department": "Sales",
+      "salary": 85000,
+      "hire_date": "2020-08-10",
+      "skills": ["CRM", "Negotiation", "B2B Sales"]
+    },
+    {
+      "id": 1005,
+      "name": "Eve Davis",
+      "department": "Engineering",
+      "salary": 105000,
+      "hire_date": "2018-01-15",
+      "skills": ["Go", "Kubernetes", "Microservices"]
+    }
+  ],
+  "departments": [
+    {
+      "name": "Engineering",
+      "budget": 500000,
+      "head": "Eve Davis"
+    },
+    {
+      "name": "Marketing",
+      "budget": 200000,
+      "head": "Carol Williams"
+    },
+    {
+      "name": "Sales",
+      "budget": 300000,
+      "head": "David Brown"
+    }
+  ]
+}

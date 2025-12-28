@@ -22,6 +22,7 @@ from claude_dev_cli.commands import (
 )
 from claude_dev_cli.usage import UsageTracker
 from claude_dev_cli import toon_utils
+from claude_dev_cli.plugins import load_plugins
 
 console = Console()
 
@@ -33,6 +34,17 @@ def main(ctx: click.Context) -> None:
     """Claude Dev CLI - AI-powered development assistant with multi-API routing."""
     ctx.ensure_object(dict)
     ctx.obj['console'] = console
+
+
+# Load plugins after main group is defined
+# Silently load plugins - they'll register their commands
+try:
+    plugins = load_plugins()
+    for plugin in plugins:
+        plugin.register_commands(main)
+except Exception:
+    # Don't fail if plugins can't load - continue without them
+    pass
 
 
 @main.command()
