@@ -28,18 +28,32 @@ class SecureStorage:
     
     SERVICE_NAME = "claude-dev-cli"
     
-    def __init__(self, config_dir: Path):
+    def __init__(self, config_dir: Path, force_encrypted_file: bool = False):
         """Initialize secure storage.
         
         Args:
             config_dir: Directory to store encrypted fallback files
+            force_encrypted_file: Force use of encrypted file storage (for testing)
         """
         self.config_dir = config_dir
         self.encrypted_file = config_dir / "keys.enc"
         self.key_file = config_dir / ".keyfile"
         
-        # Check if keyring backend is available
-        self.use_keyring = KEYRING_AVAILABLE and self._test_keyring()
+        # Check if we should use keyring (disabled in test environments)
+        # Detect test environment by checking for pytest or TESTING env var
+        in_test = (
+            force_encrypted_file or
+            'pytest' in os.environ.get('_', '') or
+            os.environ.get('PYTEST_CURRENT_TEST') is not None or
+            os.environ.get('TESTING') == '1'
+        )
+        
+        if in_test:
+            # Always use encrypted file in tests to avoid Keychain prompts
+            self.use_keyring = False
+        else:
+            # Check if keyring backend is available in production
+            self.use_keyring = KEYRING_AVAILABLE and self._test_keyring()
         
         if not self.use_keyring:
             # Initialize fallback encryption
