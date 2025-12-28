@@ -11,6 +11,13 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+try:
+    from pygments import lexers
+    from pygments.util import ClassNotFound
+    PYGMENTS_AVAILABLE = True
+except ImportError:
+    PYGMENTS_AVAILABLE = False
+
 
 class Hunk:
     """Represents a single diff hunk."""
@@ -69,6 +76,12 @@ class DiffViewer:
         self.hunks = self._generate_hunks()
         self.current_hunk_idx = 0
         self.filename = proposed_path.name
+        
+        # Detect lexer for syntax highlighting
+        self.lexer_name = self._detect_lexer()
+        
+        # History stack for undo support
+        self.history: List[Tuple[int, Optional[bool]]] = []
     
     def _detect_keybinding_mode(self) -> str:
         """Auto-detect keybinding preference from environment."""
@@ -79,6 +92,17 @@ class DiffViewer:
         if "vim" in editor or "vim" in visual or "nvim" in editor or "nvim" in visual:
             return "nvim"
         return "fresh"
+    
+    def _detect_lexer(self) -> Optional[str]:
+        """Detect appropriate lexer for syntax highlighting based on filename."""
+        if not PYGMENTS_AVAILABLE:
+            return None
+        
+        try:
+            lexer = lexers.get_lexer_for_filename(str(self.proposed_path))
+            return lexer.name
+        except ClassNotFound:
+            return None
     
     def _generate_hunks(self) -> List[Hunk]:
         """Generate hunks from diff."""
@@ -199,14 +223,28 @@ class DiffViewer:
         # Show original (if any deletions)
         if hunk.original_lines:
             self.console.print("\n[bold red]━━━ Original (-):[/bold red]")
-            for line in hunk.original_lines:
-                self.console.print(f"[red]- {line}[/red]", end="")
+            code = "".join(hunk.original_lines)
+            if self.lexer_name and code.strip():
+                syntax = Syntax(code, self.lexer_name, theme="monokai", line_numbers=False)
+                # Wrap in red for deletions
+                for line in code.splitlines():
+                    self.console.print(f"[red]- {line}[/red]")
+            else:
+                for line in hunk.original_lines:
+                    self.console.print(f"[red]- {line}[/red]", end="")
         
         # Show proposed (if any additions)
         if hunk.proposed_lines:
             self.console.print("\n[bold green]━━━ Proposed (+):[/bold green]")
-            for line in hunk.proposed_lines:
-                self.console.print(f"[green]+ {line}[/green]", end="")
+            code = "".join(hunk.proposed_lines)
+            if self.lexer_name and code.strip():
+                syntax = Syntax(code, self.lexer_name, theme="monokai", line_numbers=False)
+                # Wrap in green for additions
+                for line in code.splitlines():
+                    self.console.print(f"[green]+ {line}[/green]")
+            else:
+                for line in hunk.proposed_lines:
+                    self.console.print(f"[green]+ {line}[/green]", end="")
         
         # Context
         context = hunk.get_context()
@@ -258,9 +296,13 @@ class DiffViewer:
             
             # Process choice
             if choice in kb["accept"]:
+                # Save history before changing
+                self.history.append((self.current_hunk_idx, hunk.accepted))
                 hunk.accepted = True
                 self.current_hunk_idx += 1
             elif choice in kb["reject"]:
+                # Save history before changing
+                self.history.append((self.current_hunk_idx, hunk.accepted))
                 hunk.accepted = False
                 self.current_hunk_idx += 1
             elif choice in kb["edit"]:
@@ -283,6 +325,17 @@ class DiffViewer:
                 for h in self.hunks[self.current_hunk_idx:]:
                     h.accepted = False
                 break
+            elif choice in kb["undo"]:
+                if self.history:
+                    # Restore previous state
+                    hunk_idx, prev_state = self.history.pop()
+                    self.hunks[hunk_idx].accepted = prev_state
+                    self.current_hunk_idx = hunk_idx
+                    self.console.print("[yellow]↶ Undone last action[/yellow]")
+                    self.console.input("Press Enter to continue...")
+                else:
+                    self.console.print("[yellow]No actions to undo[/yellow]")
+                    self.console.input("Press Enter to continue...")
             elif choice in kb["quit"]:
                 self.console.print("[yellow]Quitting without applying changes[/yellow]")
                 return None
