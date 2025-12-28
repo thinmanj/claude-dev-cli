@@ -21,6 +21,7 @@ from claude_dev_cli.commands import (
     git_commit_message,
 )
 from claude_dev_cli.usage import UsageTracker
+from claude_dev_cli import toon_utils
 
 console = Console()
 
@@ -392,6 +393,125 @@ def usage(ctx: click.Context, days: Optional[int], api: Optional[str]) -> None:
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
+
+@main.group()
+def toon() -> None:
+    """TOON format conversion tools."""
+    pass
+
+
+@toon.command('encode')
+@click.argument('input_file', type=click.Path(exists=True), required=False)
+@click.option('-o', '--output', type=click.Path(), help='Output file')
+@click.pass_context
+def toon_encode(ctx: click.Context, input_file: Optional[str], output: Optional[str]) -> None:
+    """Convert JSON to TOON format."""
+    console = ctx.obj['console']
+    
+    if not toon_utils.is_toon_available():
+        console.print("[red]TOON support not installed.[/red]")
+        console.print("Install with: [cyan]pip install claude-dev-cli[toon][/cyan]")
+        sys.exit(1)
+    
+    try:
+        import json
+        
+        # Read input
+        if input_file:
+            with open(input_file, 'r') as f:
+                data = json.load(f)
+        elif not sys.stdin.isatty():
+            data = json.load(sys.stdin)
+        else:
+            console.print("[red]Error: No input provided[/red]")
+            console.print("Usage: cdc toon encode [FILE] or pipe JSON via stdin")
+            sys.exit(1)
+        
+        # Convert to TOON
+        toon_str = toon_utils.to_toon(data)
+        
+        # Output
+        if output:
+            with open(output, 'w') as f:
+                f.write(toon_str)
+            console.print(f"[green]✓[/green] Converted to TOON: {output}")
+        else:
+            console.print(toon_str)
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@toon.command('decode')
+@click.argument('input_file', type=click.Path(exists=True), required=False)
+@click.option('-o', '--output', type=click.Path(), help='Output file')
+@click.pass_context
+def toon_decode(ctx: click.Context, input_file: Optional[str], output: Optional[str]) -> None:
+    """Convert TOON format to JSON."""
+    console = ctx.obj['console']
+    
+    if not toon_utils.is_toon_available():
+        console.print("[red]TOON support not installed.[/red]")
+        console.print("Install with: [cyan]pip install claude-dev-cli[toon][/cyan]")
+        sys.exit(1)
+    
+    try:
+        import json
+        
+        # Read input
+        if input_file:
+            with open(input_file, 'r') as f:
+                toon_str = f.read()
+        elif not sys.stdin.isatty():
+            toon_str = sys.stdin.read()
+        else:
+            console.print("[red]Error: No input provided[/red]")
+            console.print("Usage: cdc toon decode [FILE] or pipe TOON via stdin")
+            sys.exit(1)
+        
+        # Convert from TOON
+        data = toon_utils.from_toon(toon_str)
+        
+        # Output
+        json_str = json.dumps(data, indent=2)
+        if output:
+            with open(output, 'w') as f:
+                f.write(json_str)
+            console.print(f"[green]✓[/green] Converted to JSON: {output}")
+        else:
+            console.print(json_str)
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@toon.command('info')
+@click.pass_context
+def toon_info(ctx: click.Context) -> None:
+    """Show TOON format installation status and token savings info."""
+    console = ctx.obj['console']
+    
+    if toon_utils.is_toon_available():
+        console.print("[green]✓[/green] TOON format support is installed")
+        console.print("\n[bold]About TOON:[/bold]")
+        console.print("• Token-Oriented Object Notation")
+        console.print("• 30-60% fewer tokens than JSON")
+        console.print("• Optimized for LLM prompts")
+        console.print("• Human-readable and lossless")
+        console.print("\n[bold]Usage:[/bold]")
+        console.print("  cdc toon encode data.json -o data.toon")
+        console.print("  cdc toon decode data.toon -o data.json")
+        console.print("  cat data.json | cdc toon encode")
+    else:
+        console.print("[yellow]TOON format support not installed[/yellow]")
+        console.print("\nInstall with: [cyan]pip install claude-dev-cli[toon][/cyan]")
+        console.print("\n[bold]Benefits:[/bold]")
+        console.print("• Reduce API costs by 30-60%")
+        console.print("• Faster LLM response times")
+        console.print("• Same data, fewer tokens")
 
 
 if __name__ == '__main__':

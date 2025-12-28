@@ -28,10 +28,25 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 - **Interactive**: Chat mode with conversation history
 - **Streaming**: Real-time responses
 
+### 🎒 TOON Format Support (Optional)
+- **Token Reduction**: 30-60% fewer tokens than JSON
+- **Cost Savings**: Reduce API costs significantly
+- **Format Conversion**: JSON ↔ TOON with CLI tools
+- **Auto-fallback**: Works without TOON installed
+
 ## Installation
+
+### Basic Installation
 
 ```bash
 pip install claude-dev-cli
+```
+
+### With TOON Support (Recommended for Cost Savings)
+
+```bash
+# Install with TOON format support for 30-60% token reduction
+pip install claude-dev-cli[toon]
 ```
 
 ## Quick Start
@@ -104,6 +119,28 @@ cdc usage --days 7
 
 # Filter by API
 cdc usage --api client
+```
+
+### 5. TOON Format (Optional - Reduces Tokens by 30-60%)
+
+```bash
+# Check if TOON is installed
+cdc toon info
+
+# Convert JSON to TOON
+echo '{"users": [{"id": 1, "name": "Alice"}]}' | cdc toon encode
+# Output:
+# users[1]{id,name}:
+# 1,Alice
+
+# Convert file
+cdc toon encode data.json -o data.toon
+
+# Convert TOON back to JSON
+cdc toon decode data.toon -o data.json
+
+# Use in workflows
+cat large_data.json | cdc toon encode | cdc ask "analyze this data"
 ```
 
 ## Configuration
