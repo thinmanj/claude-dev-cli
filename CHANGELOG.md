@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2024-12-28
+
+### Added
+- **Shell Completion**: Auto-complete for bash, zsh, and fish
+  - `cdc completion install` with auto-detection
+  - `cdc completion generate` for manual setup
+  - Tab completion for commands and options
+- **Conversation History**: Persistent chat history in interactive mode
+  - Automatic saving of all conversations
+  - `--continue` flag to resume last conversation
+  - `--save/--no-save` flag to control history
+  - `cdc history list` to view past conversations
+  - `cdc history export` to export as markdown/json
+  - Auto-save every 10 messages
+  - Search through conversation history
+
+### Changed
+- Interactive mode now preserves conversation context
+- Conversations stored in `~/.claude-dev-cli/history/`
+- Clear command resets conversation without exiting
+
 ## [0.4.0] - 2024-12-28
 
 ### Added
