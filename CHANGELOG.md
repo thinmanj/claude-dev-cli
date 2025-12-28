@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2024-12-28
+## [Unreleased]
+
+## [0.3.0] - 2024-12-28
+
+### Added
+- Plugin system architecture with base Plugin class and discovery mechanism
+- Interactive diff editor plugin with dual keybinding support (Neovim and Fresh modes)
+- `cdc diff` command for hunk-by-hunk code review
+- `cdc apply-diff` command placeholder for AI workflow integration
+- Auto-detection of keybinding preference from $EDITOR environment variable
+- Comprehensive test suite with 98 tests across 7 test files
+- CONTRIBUTING.md with developer guidelines
+- WARP.md for AI assistant guidance
+- Examples directory with usage guides for all major features
+
+### Changed
+- CLI now automatically discovers and loads plugins on startup
+- Enhanced documentation with architecture details
 
 ### Added
 - TOON format support for 30-60% token reduction
