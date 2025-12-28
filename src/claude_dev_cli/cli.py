@@ -24,6 +24,7 @@ from claude_dev_cli.commands import (
 from claude_dev_cli.usage import UsageTracker
 from claude_dev_cli import toon_utils
 from claude_dev_cli.plugins import load_plugins
+from claude_dev_cli.history import ConversationHistory, Conversation
 
 console = Console()
 
@@ -113,10 +114,35 @@ def ask(
 
 @main.command()
 @click.option('-a', '--api', help='API config to use')
+@click.option('--continue', 'continue_conversation', is_flag=True, 
+              help='Continue the last conversation')
+@click.option('--save/--no-save', default=True, help='Save conversation history')
 @click.pass_context
-def interactive(ctx: click.Context, api: Optional[str]) -> None:
+def interactive(
+    ctx: click.Context, 
+    api: Optional[str],
+    continue_conversation: bool,
+    save: bool
+) -> None:
     """Start interactive chat mode."""
     console = ctx.obj['console']
+    
+    # Setup conversation history
+    config = Config()
+    history_dir = config.config_dir / "history"
+    conv_history = ConversationHistory(history_dir)
+    
+    # Load or create conversation
+    if continue_conversation:
+        conversation = conv_history.get_latest_conversation()
+        if conversation:
+            console.print(f"[green]↶ Continuing conversation from {conversation.updated_at.strftime('%Y-%m-%d %H:%M')}[/green]")
+            console.print(f"[dim]Messages: {len(conversation.messages)}[/dim]\n")
+        else:
+            console.print("[yellow]No previous conversation found, starting new one[/yellow]\n")
+            conversation = Conversation()
+    else:
+        conversation = Conversation()
     
     console.print(Panel.fit(
         "Claude Dev CLI - Interactive Mode\n"
@@ -128,20 +154,44 @@ def interactive(ctx: click.Context, api: Optional[str]) -> None:
     
     try:
         client = ClaudeClient(api_config_name=api)
+        response_buffer = []
         
         while True:
             try:
                 user_input = console.input("\n[bold cyan]You:[/bold cyan] ").strip()
                 
                 if user_input.lower() in ['exit', 'quit']:
+                    if save and conversation.messages:
+                        conv_history.save_conversation(conversation)
+                        console.print(f"\n[dim]💾 Saved conversation: {conversation.conversation_id}[/dim]")
                     break
+                
+                if user_input.lower() == 'clear':
+                    conversation = Conversation()
+                    console.print("[yellow]Conversation cleared[/yellow]")
+                    continue
+                
                 if not user_input:
                     continue
                 
+                # Add user message to history
+                conversation.add_message("user", user_input)
+                
+                # Get response
                 console.print("\n[bold green]Claude:[/bold green] ", end='')
+                response_buffer = []
                 for chunk in client.call_streaming(user_input):
                     console.print(chunk, end='')
+                    response_buffer.append(chunk)
                 console.print()
+                
+                # Add assistant response to history
+                full_response = ''.join(response_buffer)
+                conversation.add_message("assistant", full_response)
+                
+                # Auto-save periodically
+                if save and len(conversation.messages) % 10 == 0:
+                    conv_history.save_conversation(conversation)
                 
             except KeyboardInterrupt:
                 console.print("\n\n[yellow]Interrupted. Type 'exit' to quit.[/yellow]")
@@ -149,6 +199,8 @@ def interactive(ctx: click.Context, api: Optional[str]) -> None:
     
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        if save and conversation.messages:
+            conv_history.save_conversation(conversation)
         sys.exit(1)
 
 
@@ -221,6 +273,58 @@ def completion_generate(ctx: click.Context, shell: str) -> None:
     else:
         ctx.obj['console'].print(f"[red]Error generating completion: {result.stderr}[/red]")
         sys.exit(1)
+
+
+@main.group()
+def history() -> None:
+    """Manage conversation history."""
+    pass
+
+
+@history.command('list')
+@click.option('-n', '--limit', type=int, default=10, help='Number of conversations to show')
+@click.option('-s', '--search', help='Search conversations')
+@click.pass_context
+def history_list(ctx: click.Context, limit: int, search: Optional[str]) -> None:
+    """List conversation history."""
+    console = ctx.obj['console']
+    config = Config()
+    conv_history = ConversationHistory(config.config_dir / "history")
+    
+    conversations = conv_history.list_conversations(limit=limit, search_query=search)
+    
+    if not conversations:
+        console.print("[yellow]No conversations found[/yellow]")
+        return
+    
+    for conv in conversations:
+        summary = conv.get_summary(80)
+        console.print(f"\n[cyan]{conv.conversation_id}[/cyan]")
+        console.print(f"[dim]{conv.updated_at.strftime('%Y-%m-%d %H:%M')} | {len(conv.messages)} messages[/dim]")
+        console.print(f"  {summary}")
+
+
+@history.command('export')
+@click.argument('conversation_id')
+@click.option('--format', type=click.Choice(['markdown', 'json']), default='markdown')
+@click.option('-o', '--output', type=click.Path(), help='Output file')
+@click.pass_context
+def history_export(ctx: click.Context, conversation_id: str, format: str, output: Optional[str]) -> None:
+    """Export a conversation."""
+    console = ctx.obj['console']
+    config = Config()
+    conv_history = ConversationHistory(config.config_dir / "history")
+    
+    content = conv_history.export_conversation(conversation_id, format)
+    if not content:
+        console.print(f"[red]Conversation {conversation_id} not found[/red]")
+        sys.exit(1)
+    
+    if output:
+        Path(output).write_text(content)
+        console.print(f"[green]✓[/green] Exported to {output}")
+    else:
+        click.echo(content)
 
 
 @main.group()
