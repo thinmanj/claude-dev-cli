@@ -182,6 +182,49 @@ def config_add(
             make_default=default
         )
         console.print(f"[green]✓[/green] Added API config: {name}")
+        
+        # Show storage method
+        storage_method = config.secure_storage.get_storage_method()
+        if storage_method == "keyring":
+            console.print("[dim]🔐 Stored securely in system keyring[/dim]")
+        else:
+            console.print("[dim]🔒 Stored in encrypted file (keyring unavailable)[/dim]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@config.command('migrate-keys')
+@click.pass_context
+def config_migrate_keys(ctx: click.Context) -> None:
+    """Manually migrate API keys to secure storage."""
+    console = ctx.obj['console']
+    
+    try:
+        config = Config()
+        
+        # Check if any keys need migration
+        api_configs = config._data.get("api_configs", [])
+        plaintext_keys = {c["name"]: c.get("api_key", "") 
+                         for c in api_configs 
+                         if c.get("api_key")}
+        
+        if not plaintext_keys:
+            console.print("[green]✓[/green] All keys are already in secure storage.")
+            storage_method = config.secure_storage.get_storage_method()
+            console.print(f"[dim]Using: {storage_method}[/dim]")
+            return
+        
+        console.print(f"[yellow]Found {len(plaintext_keys)} plaintext key(s)[/yellow]")
+        console.print("Migrating to secure storage...\n")
+        
+        # Trigger migration
+        config._auto_migrate_keys()
+        
+        console.print(f"[green]✓[/green] Migrated {len(plaintext_keys)} key(s) to secure storage.")
+        storage_method = config.secure_storage.get_storage_method()
+        console.print(f"[dim]Using: {storage_method}[/dim]")
+        
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
@@ -200,6 +243,14 @@ def config_list(ctx: click.Context) -> None:
         console.print("[yellow]No API configurations found.[/yellow]")
         console.print("Run 'cdc config add' to add one.")
         return
+    
+    # Show storage method
+    storage_method = config.secure_storage.get_storage_method()
+    storage_display = {
+        "keyring": "🔐 System Keyring (Secure)",
+        "encrypted_file": "🔒 Encrypted File (Fallback)"
+    }.get(storage_method, storage_method)
+    console.print(f"\n[dim]Storage: {storage_display}[/dim]\n")
     
     for cfg in api_configs:
         default_marker = " [bold green](default)[/bold green]" if cfg.default else ""

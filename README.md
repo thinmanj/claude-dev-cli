@@ -5,9 +5,10 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 ## Features
 
 ### 🔑 Multi-API Key Management
+- **Secure Storage**: API keys stored in system keyring (macOS Keychain, Linux Secret Service, Windows Credential Locker)
 - Route tasks to different Claude API keys (personal, client, enterprise)
 - Automatic API selection based on project configuration
-- Environment variable support for secure key management
+- Automatic migration from plaintext to secure storage
 
 ### 🧪 Developer Tools
 - **Test Generation**: Automatic pytest test generation for Python code
@@ -57,13 +58,17 @@ pip install claude-dev-cli[toon]
 # Add your personal API key
 export PERSONAL_ANTHROPIC_API_KEY="sk-ant-..."
 cdc config add personal --default --description "My personal API key"
+# 🔐 Stored securely in system keyring
 
 # Add client's API key
 export CLIENT_ANTHROPIC_API_KEY="sk-ant-..."
 cdc config add client --description "Client's Enterprise API"
 
-# List configured APIs
+# List configured APIs (shows storage method)
 cdc config list
+
+# Manually migrate existing keys (automatic on first run)
+cdc config migrate-keys
 ```
 
 ### 2. Basic Usage
@@ -145,22 +150,37 @@ cat large_data.json | cdc toon encode | cdc ask "analyze this data"
 
 ## Configuration
 
+### Secure API Key Storage
+
+**🔐 Your API keys are stored securely and never in plain text.**
+
+- **macOS**: Keychain
+- **Linux**: Secret Service API (GNOME Keyring, KWallet)
+- **Windows**: Windows Credential Locker
+- **Fallback**: Encrypted file (if keyring unavailable)
+
+Keys are automatically migrated from plaintext on first run. You can also manually migrate:
+
+```bash
+cdc config migrate-keys
+```
+
 ### Global Configuration
 
-Configuration is stored in `~/.claude-dev-cli/config.json`:
+Configuration metadata is stored in `~/.claude-dev-cli/config.json` (API keys are NOT in this file):
 
 ```json
 {
   "api_configs": [
     {
       "name": "personal",
-      "api_key": "sk-ant-...",
+      "api_key": "",  // Empty - actual key in secure storage
       "description": "My personal API key",
       "default": true
     },
     {
       "name": "client",
-      "api_key": "sk-ant-...",
+      "api_key": "",  // Empty - actual key in secure storage
       "description": "Client's Enterprise API",
       "default": false
     }
