@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2024-12-28
+
+### Added
+- **Secure API Key Storage**: Cross-platform keyring support
+  - macOS: Keychain integration
+  - Linux: Secret Service API (GNOME Keyring, KWallet)
+  - Windows: Windows Credential Locker
+  - Automatic fallback to encrypted file storage
+- `cdc config migrate-keys` command for manual migration
+- Test environment detection to prevent system keyring prompts during tests
+- Comprehensive test suite for secure storage (21 new tests)
+- Storage method indicators in CLI output (🔐/🔒)
+
+### Changed
+- API keys now stored securely instead of plain text
+- Automatic migration of existing plaintext keys on first run
+- Config metadata and actual keys stored separately
+- Enhanced `cdc config add` to show storage method
+- Enhanced `cdc config list` to show storage method
+
+### Security
+- **BREAKING SECURITY IMPROVEMENT**: API keys no longer stored in plain text
+- All keys automatically migrated to secure storage
+- File permissions set to 0o600 for encrypted fallback files
+- Zero plaintext key exposure
+
 ## [0.3.1] - 2024-12-28
 
 ### Added
