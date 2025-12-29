@@ -162,3 +162,257 @@ When modifying configuration:
 - Always update both `Config` class methods and serialization logic
 - Use Pydantic models for validation (`APIConfig`, `ProjectProfile`)
 - Remember to call `_save_config()` after modifications
+
+## Deployment & Release Process
+
+### Pre-Release Checklist
+
+1. **Ensure all tests pass**
+   ```bash
+   pytest --tb=short
+   # Should show all tests passing (currently 163 tests)
+   ```
+
+2. **Run code quality checks**
+   ```bash
+   black src/
+   ruff check src/
+   mypy src/
+   ```
+
+3. **Verify CLI works**
+   ```bash
+   cdc --version
+   cdc --help
+   cdc ask "test"
+   ```
+
+### Version Bump
+
+1. **Update version in two places:**
+   
+   **pyproject.toml:**
+   ```toml
+   [project]
+   version = "0.X.0"  # Update this
+   ```
+   
+   **src/claude_dev_cli/__init__.py:**
+   ```python
+   __version__ = "0.X.0"  # Update this
+   ```
+
+2. **Update CHANGELOG.md**
+   
+   Add new version section:
+   ```markdown
+   ## [Unreleased]
+   
+   ## [0.X.0] - YYYY-MM-DD
+   
+   ### Added
+   - Feature descriptions
+   
+   ### Changed
+   - Changes to existing features
+   
+   ### Fixed
+   - Bug fixes
+   ```
+
+3. **Update ROADMAP.md**
+   
+   Mark completed features and update status:
+   ```markdown
+   ## Current: v0.X.0 - Feature Name (✅ COMPLETED)
+   ```
+
+### Build & Test Locally
+
+1. **Clean previous builds**
+   ```bash
+   rm -rf dist/ build/ *.egg-info
+   ```
+
+2. **Build distribution packages**
+   ```bash
+   python3 -m build
+   # Creates dist/claude_dev_cli-0.X.0.tar.gz and .whl
+   ```
+
+3. **Verify build artifacts**
+   ```bash
+   ls -lh dist/
+   # Should show both .tar.gz and .whl files
+   ```
+
+4. **Test installation locally (optional)**
+   ```bash
+   python3 -m venv test_env
+   source test_env/bin/activate
+   pip install dist/claude_dev_cli-0.X.0-py3-none-any.whl
+   cdc --version
+   deactivate
+   rm -rf test_env
+   ```
+
+### Commit & Tag
+
+1. **Commit all changes**
+   ```bash
+   git add -A
+   git commit -m "feat: release v0.X.0 - Feature Name
+   
+   Major changes:
+   - Feature 1
+   - Feature 2
+   - Feature 3
+   
+   Statistics:
+   - X tests passing
+   - Y new features
+   
+   Co-Authored-By: Warp <agent@warp.dev>"
+   ```
+
+2. **Create git tag**
+   ```bash
+   git tag -a v0.X.0 -m "Release v0.X.0: Feature Name
+   
+   Summary of key features and changes.
+   
+   Full changelog: https://github.com/thinmanj/claude-dev-cli/blob/master/CHANGELOG.md"
+   ```
+
+### Publish to PyPI
+
+1. **Ensure twine is installed**
+   ```bash
+   pip install twine
+   ```
+
+2. **Upload to PyPI**
+   ```bash
+   twine upload dist/claude_dev_cli-0.X.0*
+   # Prompts for PyPI username and password/token
+   ```
+
+3. **Verify on PyPI**
+   - Visit: https://pypi.org/project/claude-dev-cli/
+   - Check that new version appears
+   - Verify package metadata and description
+
+### Push to GitHub
+
+1. **Push commits**
+   ```bash
+   git push origin master
+   ```
+
+2. **Push tags**
+   ```bash
+   git push origin v0.X.0
+   ```
+
+3. **Verify on GitHub**
+   - Check commits: https://github.com/thinmanj/claude-dev-cli/commits/master
+   - Check tags: https://github.com/thinmanj/claude-dev-cli/tags
+   - Check releases: https://github.com/thinmanj/claude-dev-cli/releases
+
+### Post-Release
+
+1. **Test installation from PyPI**
+   ```bash
+   pip install --upgrade claude-dev-cli
+   cdc --version  # Should show new version
+   ```
+
+2. **Update documentation**
+   - Verify README.md is current on GitHub
+   - Check that PyPI description renders correctly
+
+3. **Announce release** (optional)
+   - Create GitHub Release with changelog
+   - Update project documentation
+   - Notify users if breaking changes
+
+### Quick Release Script
+
+For convenience, here's a complete release workflow:
+
+```bash
+#!/bin/bash
+# Release script for claude-dev-cli
+
+VERSION="0.X.0"  # Update this
+
+# 1. Run tests
+echo "Running tests..."
+pytest --tb=short || exit 1
+
+# 2. Clean and build
+echo "Building packages..."
+rm -rf dist/ build/ *.egg-info
+python3 -m build || exit 1
+
+# 3. Commit and tag
+echo "Committing and tagging..."
+git add -A
+git commit -m "feat: release v${VERSION}"
+git tag -a "v${VERSION}" -m "Release v${VERSION}"
+
+# 4. Publish to PyPI
+echo "Publishing to PyPI..."
+twine upload "dist/claude_dev_cli-${VERSION}"* || exit 1
+
+# 5. Push to GitHub
+echo "Pushing to GitHub..."
+git push origin master
+git push origin "v${VERSION}"
+
+echo "✓ Release v${VERSION} complete!"
+echo "Verify at: https://pypi.org/project/claude-dev-cli/${VERSION}/"
+```
+
+### Rollback Procedure
+
+If a release has issues:
+
+1. **Yank from PyPI** (if critical bug)
+   ```bash
+   # Cannot delete, but can yank (mark as bad)
+   # This prevents new installs but doesn't break existing ones
+   # Contact PyPI support or use web interface
+   ```
+
+2. **Release hotfix version**
+   ```bash
+   # Increment patch version
+   # E.g., if 0.8.0 has issues, release 0.8.1
+   ```
+
+3. **Update documentation**
+   - Add notice in README about known issues
+   - Update CHANGELOG with hotfix details
+
+### Version Numbering Guidelines
+
+- **Major (X.0.0)**: Breaking changes, major rewrites
+- **Minor (0.X.0)**: New features, significant additions
+- **Patch (0.0.X)**: Bug fixes, minor improvements
+
+Examples:
+- New feature (context awareness): 0.8.0
+- Bug fix: 0.8.1
+- Multiple new features: 0.9.0
+- Breaking API change: 1.0.0
+
+### Release History Reference
+
+- **v0.1.0**: Initial release
+- **v0.2.0-v0.3.0**: Testing & documentation
+- **v0.4.0**: Secure storage
+- **v0.5.0**: Shell completion & conversation history
+- **v0.6.0**: Custom templates
+- **v0.7.0**: Workflows & Warp integration
+- **v0.8.0**: Context intelligence
