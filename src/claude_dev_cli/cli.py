@@ -57,6 +57,7 @@ except Exception:
 @click.option('-a', '--api', help='API config to use')
 @click.option('-m', '--model', help='Claude model to use')
 @click.option('--stream/--no-stream', default=True, help='Stream response')
+@click.option('--auto-context', is_flag=True, help='Automatically include git, dependencies, and related files')
 @click.pass_context
 def ask(
     ctx: click.Context,
@@ -65,7 +66,8 @@ def ask(
     system: Optional[str],
     api: Optional[str],
     model: Optional[str],
-    stream: bool
+    stream: bool,
+    auto_context: bool
 ) -> None:
     """Ask Claude a question (single-shot mode)."""
     console = ctx.obj['console']
@@ -73,7 +75,18 @@ def ask(
     # Build prompt
     prompt_parts = []
     
-    if file:
+    # Gather context if requested
+    if auto_context and file:
+        from claude_dev_cli.context import ContextGatherer
+        
+        with console.status("[bold blue]Gathering context..."):
+            gatherer = ContextGatherer()
+            context = gatherer.gather_for_file(Path(file))
+            context_info = context.format_for_prompt()
+        
+        console.print("[dim]✓ Context gathered[/dim]")
+        prompt_parts.append(context_info)
+    elif file:
         with open(file, 'r') as f:
             file_content = f.read()
             prompt_parts.append(f"File: {file}\n\n{file_content}\n\n")
@@ -584,19 +597,42 @@ def gen_docs(
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive follow-up questions')
+@click.option('--auto-context', is_flag=True, help='Automatically include git, dependencies, and related files')
 @click.pass_context
 def review(
     ctx: click.Context,
     file_path: str,
     api: Optional[str],
-    interactive: bool
+    interactive: bool,
+    auto_context: bool
 ) -> None:
     """Review code for bugs and improvements."""
     console = ctx.obj['console']
     
     try:
+        # Gather context if requested
+        context_info = ""
+        if auto_context:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering context..."):
+                gatherer = ContextGatherer()
+                context = gatherer.gather_for_review(Path(file_path))
+                context_info = context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered (git, dependencies, tests)[/dim]")
+        
         with console.status("[bold blue]Reviewing code..."):
-            result = code_review(file_path, api_config_name=api)
+            # If we have context, prepend it to the file analysis
+            if context_info:
+                # Read file separately for context-aware review
+                result = code_review(file_path, api_config_name=api)
+                # The context module already includes the file, so we use it differently
+                client = ClaudeClient(api_config_name=api)
+                enhanced_prompt = f"{context_info}\n\nPlease review this code for bugs and improvements."
+                result = client.call(enhanced_prompt)
+            else:
+                result = code_review(file_path, api_config_name=api)
         
         md = Markdown(result)
         console.print(md)
@@ -633,12 +669,14 @@ def review(
 @click.option('-f', '--file', type=click.Path(exists=True), help='File to debug')
 @click.option('-e', '--error', help='Error message to analyze')
 @click.option('-a', '--api', help='API config to use')
+@click.option('--auto-context', is_flag=True, help='Automatically include git context and parse error details')
 @click.pass_context
 def debug(
     ctx: click.Context,
     file: Optional[str],
     error: Optional[str],
-    api: Optional[str]
+    api: Optional[str],
+    auto_context: bool
 ) -> None:
     """Debug code and analyze errors."""
     console = ctx.obj['console']
@@ -648,13 +686,33 @@ def debug(
     if not sys.stdin.isatty():
         stdin_content = sys.stdin.read().strip()
     
+    error_text = error or stdin_content
+    
     try:
-        with console.status("[bold blue]Analyzing error..."):
-            result = debug_code(
-                file_path=file,
-                error_message=error or stdin_content,
-                api_config_name=api
-            )
+        # Gather context if requested
+        if auto_context and error_text:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering context..."):
+                gatherer = ContextGatherer()
+                file_path = Path(file) if file else None
+                context = gatherer.gather_for_error(error_text, file_path=file_path)
+                context_info = context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered (error details, git context)[/dim]")
+            
+            # Use context-aware analysis
+            client = ClaudeClient(api_config_name=api)
+            enhanced_prompt = f"{context_info}\n\nPlease analyze this error and suggest fixes."
+            result = client.call(enhanced_prompt)
+        else:
+            # Original behavior
+            with console.status("[bold blue]Analyzing error..."):
+                result = debug_code(
+                    file_path=file,
+                    error_message=error_text,
+                    api_config_name=api
+                )
         
         md = Markdown(result)
         console.print(md)
@@ -669,20 +727,38 @@ def debug(
 @click.option('-o', '--output', type=click.Path(), help='Output file path')
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
+@click.option('--auto-context', is_flag=True, help='Automatically include git, dependencies, and related files')
 @click.pass_context
 def refactor(
     ctx: click.Context,
     file_path: str,
     output: Optional[str],
     api: Optional[str],
-    interactive: bool
+    interactive: bool,
+    auto_context: bool
 ) -> None:
     """Suggest refactoring improvements."""
     console = ctx.obj['console']
     
     try:
-        with console.status("[bold blue]Analyzing code..."):
-            result = refactor_code(file_path, api_config_name=api)
+        # Gather context if requested
+        if auto_context:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering context..."):
+                gatherer = ContextGatherer()
+                context = gatherer.gather_for_file(Path(file_path))
+                context_info = context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered[/dim]")
+            
+            # Use context-aware refactoring
+            client = ClaudeClient(api_config_name=api)
+            enhanced_prompt = f"{context_info}\n\nPlease suggest refactoring improvements for the main file."
+            result = client.call(enhanced_prompt)
+        else:
+            with console.status("[bold blue]Analyzing code..."):
+                result = refactor_code(file_path, api_config_name=api)
         
         if interactive:
             console.print("\n[bold]Initial Refactoring:[/bold]\n")

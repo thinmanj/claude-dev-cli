@@ -35,6 +35,13 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 - **Variable Substitution**: Use {{variable}} placeholders for dynamic content
 - **Categories**: Organize templates by category (review, testing, debugging, etc.)
 
+### 🧠 Context Intelligence (NEW in v0.8.0)
+- **Auto-Context**: `--auto-context` flag for intelligent context gathering
+- **Git Integration**: Automatically include branch, commits, modified files
+- **Dependency Analysis**: Parse imports and include related files
+- **Error Parsing**: Structured Python traceback parsing
+- **Project Memory**: Remember preferences per project
+
 ### 🎒 TOON Format Support (Optional)
 - **Token Reduction**: 30-60% fewer tokens than JSON
 - **Cost Savings**: Reduce API costs significantly
@@ -108,11 +115,14 @@ cdc generate tests mymodule.py --interactive
 # Code review
 cdc review mymodule.py
 
+# Code review with auto-context (includes git, dependencies, tests)
+cdc review mymodule.py --auto-context
+
 # Code review with interactive follow-up questions
 cdc review mymodule.py --interactive
 
-# Debug errors
-python script.py 2>&1 | cdc debug
+# Debug errors with intelligent error parsing
+python script.py 2>&1 | cdc debug --auto-context
 
 # Generate documentation
 cdc generate docs mymodule.py
@@ -120,8 +130,8 @@ cdc generate docs mymodule.py
 # Generate docs with interactive refinement
 cdc generate docs mymodule.py --interactive
 
-# Refactor suggestions
-cdc refactor legacy_code.py
+# Refactor with context (includes related files)
+cdc refactor legacy_code.py --auto-context
 
 # Refactor with interactive refinement
 cdc refactor legacy_code.py --interactive
@@ -129,6 +139,28 @@ cdc refactor legacy_code.py --interactive
 # Git commit message
 git add .
 cdc git commit
+```
+
+### 4. Context-Aware Operations (NEW in v0.8.0)
+
+```bash
+# Auto-context includes: git info, dependencies, related files
+
+# Review with full project context
+cdc review mymodule.py --auto-context
+# ✓ Context gathered (git, dependencies, tests)
+
+# Debug with parsed error details
+python broken.py 2>&1 | cdc debug -f broken.py --auto-context
+# ✓ Context gathered (error details, git context)
+
+# Ask questions with file context
+cdc ask -f mycode.py --auto-context "how can I improve this?"
+# ✓ Context gathered
+
+# Refactor with related files
+cdc refactor app.py --auto-context
+# Automatically includes imported modules and dependencies
 ```
 
 ### 5. Custom Templates

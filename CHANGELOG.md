@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2024-12-29
+
+### Added
+- **Context-Aware Operations**: Intelligent context gathering for smarter AI responses
+  - `--auto-context` flag for ask, review, debug, refactor commands
+  - Automatic inclusion of git context (branch, commits, modified files)
+  - Dependency analysis and related file discovery
+  - Python import parsing using AST
+  - Multi-language dependency detection (Python, Node.js, Go, Rust)
+  - Error context with structured traceback parsing
+- **Context Module**: New `context.py` with 494 lines
+  - GitContext: Git repository information gathering
+  - DependencyAnalyzer: Import and dependency analysis
+  - ErrorContext: Smart error parsing and formatting
+  - ContextGatherer: Coordinator with specialized methods
+- **Project Memory**: Enhanced ProjectProfile in config
+  - `auto_context`: Default --auto-context behavior per project
+  - `coding_style`: Remember preferred coding style
+  - `test_framework`: Remember preferred test framework
+  - `preferences`: Custom key-value preferences
+
+### Enhanced
+- Commands now support intelligent context gathering
+- Review command includes test files automatically with --auto-context
+- Debug command includes parsed error details with --auto-context
+- Ask/refactor commands include dependencies and related files
+
 ## [0.7.0] - 2024-12-29
 
 ### Added

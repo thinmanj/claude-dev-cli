@@ -25,6 +25,12 @@ class ProjectProfile(BaseModel):
     api_config: str  # Name of the API config to use
     system_prompt: Optional[str] = None
     allowed_commands: List[str] = Field(default_factory=lambda: ["all"])
+    
+    # Project memory - preferences and patterns
+    auto_context: bool = False  # Default value for --auto-context flag
+    coding_style: Optional[str] = None  # Preferred coding style
+    test_framework: Optional[str] = None  # Preferred test framework
+    preferences: Dict[str, str] = Field(default_factory=dict)  # Custom preferences
 
 
 class Config:
