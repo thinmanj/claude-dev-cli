@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Interactive Mode for Generation Commands**: Add `--interactive` / `-i` flag to all generation commands
+  - `cdc generate tests --interactive`: Iteratively refine generated tests
+  - `cdc generate docs --interactive`: Iteratively refine documentation
+  - `cdc review --interactive`: Ask follow-up questions about code review findings
+  - `cdc refactor --interactive`: Iteratively improve refactoring suggestions
+  - Commands: 'save' to save and exit, 'exit' to discard changes
+  - Maintains conversation context for intelligent refinements
+
 ## [0.6.0] - 2024-12-29
 
 ### Added

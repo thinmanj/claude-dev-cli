@@ -447,12 +447,14 @@ def generate() -> None:
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(), help='Output file path')
 @click.option('-a', '--api', help='API config to use')
+@click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.pass_context
 def gen_tests(
     ctx: click.Context,
     file_path: str,
     output: Optional[str],
-    api: Optional[str]
+    api: Optional[str],
+    interactive: bool
 ) -> None:
     """Generate pytest tests for a Python file."""
     console = ctx.obj['console']
@@ -461,11 +463,48 @@ def gen_tests(
         with console.status("[bold blue]Generating tests..."):
             result = generate_tests(file_path, api_config_name=api)
         
+        if interactive:
+            # Show initial result
+            console.print("\n[bold]Initial Tests:[/bold]\n")
+            console.print(result)
+            
+            # Interactive refinement loop
+            client = ClaudeClient(api_config_name=api)
+            conversation_context = [result]
+            
+            while True:
+                console.print("\n[dim]Commands: 'save' to save and exit, 'exit' to discard, or ask for changes[/dim]")
+                user_input = console.input("[cyan]You:[/cyan] ").strip()
+                
+                if user_input.lower() == 'exit':
+                    console.print("[yellow]Discarded changes[/yellow]")
+                    return
+                
+                if user_input.lower() == 'save':
+                    result = conversation_context[-1]
+                    break
+                
+                if not user_input:
+                    continue
+                
+                # Get refinement
+                refinement_prompt = f"Previous tests:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated tests."
+                
+                console.print("\n[bold green]Claude:[/bold green] ", end='')
+                response_parts = []
+                for chunk in client.call_streaming(refinement_prompt):
+                    console.print(chunk, end='')
+                    response_parts.append(chunk)
+                console.print()
+                
+                result = ''.join(response_parts)
+                conversation_context.append(result)
+        
         if output:
             with open(output, 'w') as f:
                 f.write(result)
-            console.print(f"[green]✓[/green] Tests saved to: {output}")
-        else:
+            console.print(f"\n[green]✓[/green] Tests saved to: {output}")
+        elif not interactive:
             console.print(result)
     
     except Exception as e:
@@ -477,12 +516,14 @@ def gen_tests(
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(), help='Output file path')
 @click.option('-a', '--api', help='API config to use')
+@click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.pass_context
 def gen_docs(
     ctx: click.Context,
     file_path: str,
     output: Optional[str],
-    api: Optional[str]
+    api: Optional[str],
+    interactive: bool
 ) -> None:
     """Generate documentation for a Python file."""
     console = ctx.obj['console']
@@ -491,11 +532,46 @@ def gen_docs(
         with console.status("[bold blue]Generating documentation..."):
             result = generate_docs(file_path, api_config_name=api)
         
+        if interactive:
+            console.print("\n[bold]Initial Documentation:[/bold]\n")
+            md = Markdown(result)
+            console.print(md)
+            
+            client = ClaudeClient(api_config_name=api)
+            conversation_context = [result]
+            
+            while True:
+                console.print("\n[dim]Commands: 'save' to save and exit, 'exit' to discard, or ask for changes[/dim]")
+                user_input = console.input("[cyan]You:[/cyan] ").strip()
+                
+                if user_input.lower() == 'exit':
+                    console.print("[yellow]Discarded changes[/yellow]")
+                    return
+                
+                if user_input.lower() == 'save':
+                    result = conversation_context[-1]
+                    break
+                
+                if not user_input:
+                    continue
+                
+                refinement_prompt = f"Previous documentation:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated documentation."
+                
+                console.print("\n[bold green]Claude:[/bold green] ", end='')
+                response_parts = []
+                for chunk in client.call_streaming(refinement_prompt):
+                    console.print(chunk, end='')
+                    response_parts.append(chunk)
+                console.print()
+                
+                result = ''.join(response_parts)
+                conversation_context.append(result)
+        
         if output:
             with open(output, 'w') as f:
                 f.write(result)
-            console.print(f"[green]✓[/green] Documentation saved to: {output}")
-        else:
+            console.print(f"\n[green]✓[/green] Documentation saved to: {output}")
+        elif not interactive:
             md = Markdown(result)
             console.print(md)
     
@@ -507,11 +583,13 @@ def gen_docs(
 @main.command('review')
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('-a', '--api', help='API config to use')
+@click.option('-i', '--interactive', is_flag=True, help='Interactive follow-up questions')
 @click.pass_context
 def review(
     ctx: click.Context,
     file_path: str,
-    api: Optional[str]
+    api: Optional[str],
+    interactive: bool
 ) -> None:
     """Review code for bugs and improvements."""
     console = ctx.obj['console']
@@ -522,6 +600,29 @@ def review(
         
         md = Markdown(result)
         console.print(md)
+        
+        if interactive:
+            client = ClaudeClient(api_config_name=api)
+            with open(file_path, 'r') as f:
+                file_content = f.read()
+            
+            console.print("\n[dim]Ask follow-up questions about the review, or 'exit' to quit[/dim]")
+            
+            while True:
+                user_input = console.input("\n[cyan]You:[/cyan] ").strip()
+                
+                if user_input.lower() == 'exit':
+                    break
+                
+                if not user_input:
+                    continue
+                
+                follow_up_prompt = f"Code review:\n\n{result}\n\nOriginal code:\n\n{file_content}\n\nUser question: {user_input}"
+                
+                console.print("\n[bold green]Claude:[/bold green] ", end='')
+                for chunk in client.call_streaming(follow_up_prompt):
+                    console.print(chunk, end='')
+                console.print()
     
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -567,12 +668,14 @@ def debug(
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(), help='Output file path')
 @click.option('-a', '--api', help='API config to use')
+@click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.pass_context
 def refactor(
     ctx: click.Context,
     file_path: str,
     output: Optional[str],
-    api: Optional[str]
+    api: Optional[str],
+    interactive: bool
 ) -> None:
     """Suggest refactoring improvements."""
     console = ctx.obj['console']
@@ -581,11 +684,46 @@ def refactor(
         with console.status("[bold blue]Analyzing code..."):
             result = refactor_code(file_path, api_config_name=api)
         
+        if interactive:
+            console.print("\n[bold]Initial Refactoring:[/bold]\n")
+            md = Markdown(result)
+            console.print(md)
+            
+            client = ClaudeClient(api_config_name=api)
+            conversation_context = [result]
+            
+            while True:
+                console.print("\n[dim]Commands: 'save' to save and exit, 'exit' to discard, or ask for changes[/dim]")
+                user_input = console.input("[cyan]You:[/cyan] ").strip()
+                
+                if user_input.lower() == 'exit':
+                    console.print("[yellow]Discarded changes[/yellow]")
+                    return
+                
+                if user_input.lower() == 'save':
+                    result = conversation_context[-1]
+                    break
+                
+                if not user_input:
+                    continue
+                
+                refinement_prompt = f"Previous refactoring:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated refactoring suggestions."
+                
+                console.print("\n[bold green]Claude:[/bold green] ", end='')
+                response_parts = []
+                for chunk in client.call_streaming(refinement_prompt):
+                    console.print(chunk, end='')
+                    response_parts.append(chunk)
+                console.print()
+                
+                result = ''.join(response_parts)
+                conversation_context.append(result)
+        
         if output:
             with open(output, 'w') as f:
                 f.write(result)
-            console.print(f"[green]✓[/green] Refactored code saved to: {output}")
-        else:
+            console.print(f"\n[green]✓[/green] Refactored code saved to: {output}")
+        elif not interactive:
             md = Markdown(result)
             console.print(md)
     

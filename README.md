@@ -102,8 +102,14 @@ cdc ask -a client "generate tests for this function"
 # Generate tests
 cdc generate tests mymodule.py -o tests/test_mymodule.py
 
+# Generate tests with interactive refinement
+cdc generate tests mymodule.py --interactive
+
 # Code review
 cdc review mymodule.py
+
+# Code review with interactive follow-up questions
+cdc review mymodule.py --interactive
 
 # Debug errors
 python script.py 2>&1 | cdc debug
@@ -111,8 +117,14 @@ python script.py 2>&1 | cdc debug
 # Generate documentation
 cdc generate docs mymodule.py
 
+# Generate docs with interactive refinement
+cdc generate docs mymodule.py --interactive
+
 # Refactor suggestions
 cdc refactor legacy_code.py
+
+# Refactor with interactive refinement
+cdc refactor legacy_code.py --interactive
 
 # Git commit message
 git add .
