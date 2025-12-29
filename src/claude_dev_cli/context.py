@@ -1,0 +1,494 @@
+"""Intelligent context gathering for AI operations."""
+
+import ast
+import json
+import re
+import subprocess
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+from dataclasses import dataclass, field
+
+
+@dataclass
+class ContextItem:
+    """A single piece of context information."""
+    type: str  # 'file', 'git', 'dependency', 'error'
+    content: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def format_for_prompt(self) -> str:
+        """Format this context item for inclusion in a prompt."""
+        if self.type == 'file':
+            path = self.metadata.get('path', 'unknown')
+            return f"# File: {path}\n\n{self.content}\n"
+        elif self.type == 'git':
+            return f"# Git Context\n\n{self.content}\n"
+        elif self.type == 'dependency':
+            return f"# Dependencies\n\n{self.content}\n"
+        elif self.type == 'error':
+            return f"# Error Context\n\n{self.content}\n"
+        else:
+            return self.content
+
+
+@dataclass
+class Context:
+    """Collection of context items."""
+    items: List[ContextItem] = field(default_factory=list)
+    
+    def add(self, item: ContextItem) -> None:
+        """Add a context item."""
+        self.items.append(item)
+    
+    def format_for_prompt(self) -> str:
+        """Format all context items for inclusion in a prompt."""
+        if not self.items:
+            return ""
+        
+        parts = ["# Context Information\n"]
+        for item in self.items:
+            parts.append(item.format_for_prompt())
+        
+        return "\n".join(parts)
+    
+    def get_by_type(self, context_type: str) -> List[ContextItem]:
+        """Get all context items of a specific type."""
+        return [item for item in self.items if item.type == context_type]
+
+
+class GitContext:
+    """Gather Git-related context."""
+    
+    def __init__(self, cwd: Optional[Path] = None):
+        self.cwd = cwd or Path.cwd()
+    
+    def is_git_repo(self) -> bool:
+        """Check if current directory is a git repository."""
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--git-dir'],
+                cwd=self.cwd,
+                capture_output=True,
+                text=True
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+    
+    def get_current_branch(self) -> Optional[str]:
+        """Get the current git branch."""
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                cwd=self.cwd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return result.stdout.strip()
+        except Exception:
+            return None
+    
+    def get_recent_commits(self, count: int = 5) -> List[Dict[str, str]]:
+        """Get recent commit messages."""
+        try:
+            result = subprocess.run(
+                ['git', '--no-pager', 'log', f'-{count}', '--pretty=format:%h|%s|%an|%ar'],
+                cwd=self.cwd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            commits = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    parts = line.split('|', 3)
+                    if len(parts) == 4:
+                        commits.append({
+                            'hash': parts[0],
+                            'message': parts[1],
+                            'author': parts[2],
+                            'date': parts[3]
+                        })
+            return commits
+        except Exception:
+            return []
+    
+    def get_staged_diff(self) -> Optional[str]:
+        """Get diff of staged changes."""
+        try:
+            result = subprocess.run(
+                ['git', '--no-pager', 'diff', '--cached'],
+                cwd=self.cwd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return result.stdout if result.stdout else None
+        except Exception:
+            return None
+    
+    def get_unstaged_diff(self) -> Optional[str]:
+        """Get diff of unstaged changes."""
+        try:
+            result = subprocess.run(
+                ['git', '--no-pager', 'diff'],
+                cwd=self.cwd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return result.stdout if result.stdout else None
+        except Exception:
+            return None
+    
+    def get_modified_files(self) -> List[str]:
+        """Get list of modified files."""
+        try:
+            result = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                cwd=self.cwd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            files = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    # Format: "XY filename"
+                    parts = line.strip().split(maxsplit=1)
+                    if len(parts) == 2:
+                        files.append(parts[1])
+            return files
+        except Exception:
+            return []
+    
+    def gather(self, include_diff: bool = False) -> ContextItem:
+        """Gather all git context."""
+        parts = []
+        
+        branch = self.get_current_branch()
+        if branch:
+            parts.append(f"Branch: {branch}")
+        
+        commits = self.get_recent_commits(5)
+        if commits:
+            parts.append("\nRecent commits:")
+            for commit in commits:
+                parts.append(f"  {commit['hash']} - {commit['message']} ({commit['date']})")
+        
+        modified = self.get_modified_files()
+        if modified:
+            parts.append(f"\nModified files: {', '.join(modified[:10])}")
+        
+        if include_diff:
+            staged = self.get_staged_diff()
+            if staged:
+                parts.append(f"\nStaged changes:\n{staged[:1000]}...")  # Limit size
+        
+        content = "\n".join(parts) if parts else "No git context available"
+        
+        return ContextItem(
+            type='git',
+            content=content,
+            metadata={'branch': branch, 'modified_count': len(modified)}
+        )
+
+
+class DependencyAnalyzer:
+    """Analyze project dependencies and imports."""
+    
+    def __init__(self, project_root: Path):
+        self.project_root = project_root
+    
+    def find_python_imports(self, file_path: Path) -> Set[str]:
+        """Extract imports from a Python file."""
+        imports = set()
+        
+        try:
+            with open(file_path, 'r') as f:
+                tree = ast.parse(f.read())
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for name in node.names:
+                        imports.add(name.name.split('.')[0])
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module:
+                        imports.add(node.module.split('.')[0])
+        except Exception:
+            pass
+        
+        return imports
+    
+    def find_related_files(self, file_path: Path, max_depth: int = 2) -> List[Path]:
+        """Find files related to the given file through imports."""
+        if not file_path.suffix == '.py':
+            return []
+        
+        related = []
+        imports = self.find_python_imports(file_path)
+        
+        # Look for local modules
+        for imp in imports:
+            # Try as module file
+            module_file = self.project_root / f"{imp}.py"
+            if module_file.exists() and module_file != file_path:
+                related.append(module_file)
+            
+            # Try as package
+            package_init = self.project_root / imp / "__init__.py"
+            if package_init.exists():
+                related.append(package_init)
+        
+        return related[:5]  # Limit to avoid too many files
+    
+    def get_dependency_files(self) -> List[Path]:
+        """Find dependency configuration files."""
+        files = []
+        
+        # Python
+        for name in ['requirements.txt', 'setup.py', 'pyproject.toml', 'Pipfile']:
+            file = self.project_root / name
+            if file.exists():
+                files.append(file)
+        
+        # Node.js
+        for name in ['package.json', 'package-lock.json']:
+            file = self.project_root / name
+            if file.exists():
+                files.append(file)
+        
+        # Other
+        for name in ['Gemfile', 'go.mod', 'Cargo.toml']:
+            file = self.project_root / name
+            if file.exists():
+                files.append(file)
+        
+        return files
+    
+    def gather(self, target_file: Optional[Path] = None) -> ContextItem:
+        """Gather dependency context."""
+        parts = []
+        
+        # Include dependency files
+        dep_files = self.get_dependency_files()
+        if dep_files:
+            parts.append("Dependency files:")
+            for file in dep_files[:3]:  # Limit
+                parts.append(f"  - {file.name}")
+                try:
+                    content = file.read_text()
+                    # Include only relevant parts
+                    if file.suffix == '.json':
+                        data = json.loads(content)
+                        if 'dependencies' in data:
+                            parts.append(f"    Dependencies: {', '.join(list(data['dependencies'].keys())[:10])}")
+                    elif file.suffix == '.txt':
+                        lines = content.split('\n')[:20]
+                        parts.append(f"    Requirements: {', '.join([l.split('==')[0] for l in lines if l and not l.startswith('#')])}")
+                except Exception:
+                    pass
+        
+        # Related files if target specified
+        if target_file and target_file.exists():
+            related = self.find_related_files(target_file)
+            if related:
+                parts.append(f"\nRelated files for {target_file.name}:")
+                for file in related:
+                    parts.append(f"  - {file.relative_to(self.project_root)}")
+        
+        content = "\n".join(parts) if parts else "No dependency context found"
+        
+        return ContextItem(
+            type='dependency',
+            content=content,
+            metadata={'dependency_files': [str(f) for f in dep_files]}
+        )
+
+
+class ErrorContext:
+    """Parse and format error context."""
+    
+    @staticmethod
+    def parse_traceback(error_text: str) -> Dict[str, Any]:
+        """Parse Python traceback into structured data."""
+        lines = error_text.split('\n')
+        
+        # Find traceback start
+        traceback_start = -1
+        for i, line in enumerate(lines):
+            if 'Traceback' in line:
+                traceback_start = i
+                break
+        
+        if traceback_start == -1:
+            return {'raw': error_text}
+        
+        # Extract frames
+        frames = []
+        current_frame = {}
+        
+        for line in lines[traceback_start + 1:]:
+            if line.startswith('  File '):
+                if current_frame:
+                    frames.append(current_frame)
+                
+                # Parse: File "path", line X, in function
+                match = re.match(r'\s*File "([^"]+)", line (\d+), in (.+)', line)
+                if match:
+                    current_frame = {
+                        'file': match.group(1),
+                        'line': int(match.group(2)),
+                        'function': match.group(3)
+                    }
+            elif line.startswith('    ') and current_frame:
+                current_frame['code'] = line.strip()
+            elif line and not line.startswith(' '):
+                # Error message
+                if current_frame:
+                    frames.append(current_frame)
+                    current_frame = {}
+                
+                error_type = line.split(':')[0] if ':' in line else line
+                error_message = line.split(':', 1)[1].strip() if ':' in line else ''
+                
+                return {
+                    'frames': frames,
+                    'error_type': error_type,
+                    'error_message': error_message,
+                    'raw': error_text
+                }
+        
+        return {'frames': frames, 'raw': error_text}
+    
+    @staticmethod
+    def format_for_ai(error_text: str) -> str:
+        """Format error for AI consumption."""
+        parsed = ErrorContext.parse_traceback(error_text)
+        
+        if 'error_type' not in parsed:
+            return error_text
+        
+        parts = [
+            f"Error Type: {parsed['error_type']}",
+            f"Error Message: {parsed.get('error_message', 'N/A')}",
+            "\nStack Trace:"
+        ]
+        
+        for i, frame in enumerate(parsed.get('frames', []), 1):
+            parts.append(f"  {i}. {frame.get('file', 'unknown')}:{frame.get('line', '?')} in {frame.get('function', 'unknown')}")
+            if 'code' in frame:
+                parts.append(f"     > {frame['code']}")
+        
+        return "\n".join(parts)
+    
+    def gather(self, error_text: str) -> ContextItem:
+        """Gather error context."""
+        formatted = self.format_for_ai(error_text)
+        parsed = self.parse_traceback(error_text)
+        
+        return ContextItem(
+            type='error',
+            content=formatted,
+            metadata=parsed
+        )
+
+
+class ContextGatherer:
+    """Main context gathering coordinator."""
+    
+    def __init__(self, project_root: Optional[Path] = None):
+        self.project_root = project_root or Path.cwd()
+        self.git = GitContext(self.project_root)
+        self.dependencies = DependencyAnalyzer(self.project_root)
+        self.error_parser = ErrorContext()
+    
+    def gather_for_file(
+        self,
+        file_path: Path,
+        include_git: bool = True,
+        include_dependencies: bool = True,
+        include_related: bool = True
+    ) -> Context:
+        """Gather context for a specific file operation."""
+        context = Context()
+        
+        # Add the file itself
+        if file_path.exists():
+            context.add(ContextItem(
+                type='file',
+                content=file_path.read_text(),
+                metadata={'path': str(file_path)}
+            ))
+        
+        # Add git context
+        if include_git and self.git.is_git_repo():
+            context.add(self.git.gather(include_diff=False))
+        
+        # Add dependency context
+        if include_dependencies:
+            context.add(self.dependencies.gather(target_file=file_path if include_related else None))
+        
+        return context
+    
+    def gather_for_error(
+        self,
+        error_text: str,
+        file_path: Optional[Path] = None,
+        include_git: bool = True
+    ) -> Context:
+        """Gather context for error debugging."""
+        context = Context()
+        
+        # Add error context
+        context.add(self.error_parser.gather(error_text))
+        
+        # Add file if provided
+        if file_path and file_path.exists():
+            context.add(ContextItem(
+                type='file',
+                content=file_path.read_text(),
+                metadata={'path': str(file_path)}
+            ))
+        
+        # Add git context
+        if include_git and self.git.is_git_repo():
+            context.add(self.git.gather(include_diff=False))
+        
+        return context
+    
+    def gather_for_review(
+        self,
+        file_path: Path,
+        include_git: bool = True,
+        include_tests: bool = True
+    ) -> Context:
+        """Gather context for code review."""
+        context = self.gather_for_file(
+            file_path,
+            include_git=include_git,
+            include_dependencies=True,
+            include_related=True
+        )
+        
+        # Try to find test file
+        if include_tests:
+            test_patterns = [
+                self.project_root / "tests" / f"test_{file_path.name}",
+                self.project_root / f"test_{file_path.name}",
+                file_path.parent / f"test_{file_path.name}"
+            ]
+            
+            for test_file in test_patterns:
+                if test_file.exists():
+                    context.add(ContextItem(
+                        type='file',
+                        content=test_file.read_text(),
+                        metadata={'path': str(test_file), 'is_test': True}
+                    ))
+                    break
+        
+        return context
