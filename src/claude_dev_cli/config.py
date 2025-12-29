@@ -9,6 +9,18 @@ from pydantic import BaseModel, Field
 from claude_dev_cli.secure_storage import SecureStorage
 
 
+class ContextConfig(BaseModel):
+    """Global context gathering configuration."""
+    
+    auto_context_default: bool = False  # Default for --auto-context flag
+    max_file_lines: int = 1000  # Maximum lines per file in context
+    max_related_files: int = 5  # Maximum related files to include
+    max_diff_lines: int = 200  # Maximum lines of diff to include
+    include_git: bool = True  # Include git context by default
+    include_dependencies: bool = True  # Include dependencies by default
+    include_tests: bool = True  # Include test files by default
+
+
 class APIConfig(BaseModel):
     """Configuration for a Claude API key."""
     
@@ -74,6 +86,7 @@ class Config:
                 "project_profiles": [],
                 "default_model": "claude-3-5-sonnet-20241022",
                 "max_tokens": 4096,
+                "context": ContextConfig().model_dump(),
             }
             self._save_config(default_config)
             return default_config
@@ -245,3 +258,8 @@ class Config:
     def get_max_tokens(self) -> int:
         """Get default max tokens."""
         return self._data.get("max_tokens", 4096)
+    
+    def get_context_config(self) -> ContextConfig:
+        """Get context gathering configuration."""
+        context_data = self._data.get("context", {})
+        return ContextConfig(**context_data) if context_data else ContextConfig()

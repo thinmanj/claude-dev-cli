@@ -547,16 +547,47 @@ cdc generate tests legacy/old_code.py --interactive
 cdc workflow run refactor-and-verify.yaml -v file=legacy/old_code.py
 ```
 
+### 5. Context Configuration (v0.8.1+)
+
+```bash
+# Global context configuration in ~/.claude-dev-cli/config.json
+# Add this section:
+{
+  "context": {
+    "auto_context_default": false,
+    "max_file_lines": 1000,
+    "max_related_files": 5,
+    "max_diff_lines": 200,
+    "include_git": true,
+    "include_dependencies": true,
+    "include_tests": true
+  }
+}
+
+# Per-project context configuration in .claude-dev-cli
+{
+  "name": "My Project",
+  "api_config": "client",
+  "auto_context": true,
+  "max_context_files": 5,
+  "max_diff_lines": 200,
+  "max_file_lines": 1000,
+  "include_tests_by_default": true,
+  "context_depth": 2
+}
+```
+
 ## 🎓 Pro Tips
 
 1. **Use `--auto-context` for complex questions** - It provides much better answers
-2. **Create project-specific `.claude-dev-cli` configs** - Saves time and uses correct APIs
-3. **Use templates for repetitive tasks** - Consistency and speed
-4. **Leverage workflows for multi-step processes** - Automation and reliability
-5. **Enable shell completion** - Faster command entry
-6. **Use interactive mode for exploration** - Great for learning new concepts
-7. **Monitor usage per API** - Track costs per project/client
-8. **Export conversations** - Documentation and knowledge sharing
+2. **Configure context limits for large projects** - Prevent token overflow with `max_file_lines`
+3. **Create project-specific `.claude-dev-cli` configs** - Saves time and uses correct APIs
+4. **Use templates for repetitive tasks** - Consistency and speed
+5. **Leverage workflows for multi-step processes** - Automation and reliability
+6. **Enable shell completion** - Faster command entry
+7. **Use interactive mode for exploration** - Great for learning new concepts
+8. **Monitor usage per API** - Track costs per project/client
+9. **Export conversations** - Documentation and knowledge sharing
 
 ## 📖 Next Steps
 

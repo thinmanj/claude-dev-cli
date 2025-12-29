@@ -35,12 +35,16 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 - **Variable Substitution**: Use {{variable}} placeholders for dynamic content
 - **Categories**: Organize templates by category (review, testing, debugging, etc.)
 
-### 🧠 Context Intelligence (NEW in v0.8.0)
-- **Auto-Context**: `--auto-context` flag for intelligent context gathering
+### 🧠 Context Intelligence (v0.8.0+)
+- **Auto-Context**: `--auto-context` flag on 7 commands for intelligent context gathering
+  - `ask`, `review`, `debug`, `refactor` (v0.8.0)
+  - `git commit`, `generate tests`, `generate docs` (v0.8.1)
 - **Git Integration**: Automatically include branch, commits, modified files
 - **Dependency Analysis**: Parse imports and include related files
 - **Error Parsing**: Structured Python traceback parsing
+- **Smart Truncation**: Prevent token limits with configurable file size limits
 - **Project Memory**: Remember preferences per project
+- **Global Config**: Set context defaults in `~/.claude-dev-cli/config.json`
 
 ### 🎒 TOON Format Support (Optional)
 - **Token Reduction**: 30-60% fewer tokens than JSON
@@ -112,6 +116,9 @@ cdc generate tests mymodule.py -o tests/test_mymodule.py
 # Generate tests with interactive refinement
 cdc generate tests mymodule.py --interactive
 
+# Generate tests with context (includes dependencies, related files) - NEW in v0.8.1
+cdc generate tests mymodule.py --auto-context
+
 # Code review
 cdc review mymodule.py
 
@@ -130,6 +137,9 @@ cdc generate docs mymodule.py
 # Generate docs with interactive refinement
 cdc generate docs mymodule.py --interactive
 
+# Generate docs with context (includes dependencies) - NEW in v0.8.1  
+cdc generate docs mymodule.py --auto-context
+
 # Refactor with context (includes related files)
 cdc refactor legacy_code.py --auto-context
 
@@ -139,6 +149,10 @@ cdc refactor legacy_code.py --interactive
 # Git commit message
 git add .
 cdc git commit
+
+# Git commit message with context (includes history, branch) - NEW in v0.8.1
+git add .
+cdc git commit --auto-context
 ```
 
 ### 4. Context-Aware Operations (NEW in v0.8.0)

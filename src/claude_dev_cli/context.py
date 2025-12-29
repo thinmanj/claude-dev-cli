@@ -184,8 +184,13 @@ class GitContext:
         except Exception:
             return []
     
-    def gather(self, include_diff: bool = False) -> ContextItem:
-        """Gather all git context."""
+    def gather(self, include_diff: bool = False, max_diff_lines: int = 200) -> ContextItem:
+        """Gather all git context.
+        
+        Args:
+            include_diff: Include staged diff in context
+            max_diff_lines: Maximum lines of diff to include
+        """
         parts = []
         
         branch = self.get_current_branch()
@@ -205,7 +210,12 @@ class GitContext:
         if include_diff:
             staged = self.get_staged_diff()
             if staged:
-                parts.append(f"\nStaged changes:\n{staged[:1000]}...")  # Limit size
+                diff_lines = staged.split('\n')
+                if len(diff_lines) > max_diff_lines:
+                    truncated_diff = '\n'.join(diff_lines[:max_diff_lines])
+                    parts.append(f"\nStaged changes (truncated {len(diff_lines) - max_diff_lines} lines):\n{truncated_diff}\n... (diff truncated)")
+                else:
+                    parts.append(f"\nStaged changes:\n{staged}")
         
         content = "\n".join(parts) if parts else "No git context available"
         

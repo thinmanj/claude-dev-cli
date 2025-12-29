@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2024-12-29
+
+### Added
+- **Extended Context Support**: `--auto-context` flag now available on more commands
+  - `cdc git commit --auto-context`: Include git history and branch context for better commit messages
+  - `cdc generate tests --auto-context`: Include dependencies and related files for comprehensive tests
+  - `cdc generate docs --auto-context`: Include dependencies and related files for better documentation
+- **Smart Truncation System**: Prevent token limit issues with large files
+  - `ContextItem.truncate()` method with configurable max_lines
+  - Automatic truncation indicators showing "... (truncated X lines)"
+  - Truncation metadata tracking for transparency
+- **Global Context Configuration**: New `context` section in `~/.claude-dev-cli/config.json`
+  - `auto_context_default`: Default for --auto-context flag (default: false)
+  - `max_file_lines`: Maximum lines per file (default: 1000)
+  - `max_related_files`: Maximum related files to include (default: 5)
+  - `max_diff_lines`: Maximum lines of diff (default: 200)
+  - `include_git`, `include_dependencies`, `include_tests`: Toggle context types
+- **ProjectProfile Context Settings**: Per-project context configuration in `.claude-dev-cli`
+  - `max_context_files`: Limit related files
+  - `max_diff_lines`: Limit diff size
+  - `max_file_lines`: Limit lines per file
+  - `include_tests_by_default`: Auto-include test files
+  - `context_depth`: Control module search depth
+- **Diff Size Limiting**: Intelligent truncation of large git diffs
+  - `GitContext.gather()` accepts `max_diff_lines` parameter
+  - Shows truncation indicators for visibility
+
+### Enhanced
+- `ContextGatherer` now accepts `max_file_lines` and `max_related_files` parameters
+- All `gather_*` methods support optional `max_lines` parameter
+- Git commit messages now benefit from full repository context
+- Test and documentation generation improved with dependency awareness
+- File context automatically truncated to prevent overwhelming AI
+
+### Changed
+- Context gathering respects size limits from config (global or per-project)
+- Large files show truncation notices with original line count
+- Diff output intelligently truncated with summary
+
 ## [0.8.0] - 2024-12-29
 
 ### Added
