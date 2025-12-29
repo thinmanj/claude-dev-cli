@@ -16,11 +16,30 @@ class ContextItem:
     content: str
     metadata: Dict[str, Any] = field(default_factory=dict)
     
+    def truncate(self, max_lines: Optional[int] = None) -> 'ContextItem':
+        """Truncate content to specified number of lines."""
+        if max_lines is None:
+            return self
+        
+        lines = self.content.split('\n')
+        if len(lines) <= max_lines:
+            return self
+        
+        truncated_lines = lines[:max_lines]
+        truncated_lines.append(f"\n... (truncated {len(lines) - max_lines} more lines)")
+        
+        return ContextItem(
+            type=self.type,
+            content='\n'.join(truncated_lines),
+            metadata={**self.metadata, 'truncated': True, 'original_lines': len(lines)}
+        )
+    
     def format_for_prompt(self) -> str:
         """Format this context item for inclusion in a prompt."""
         if self.type == 'file':
             path = self.metadata.get('path', 'unknown')
-            return f"# File: {path}\n\n{self.content}\n"
+            truncated_note = " (truncated)" if self.metadata.get('truncated') else ""
+            return f"# File: {path}{truncated_note}\n\n{self.content}\n"
         elif self.type == 'git':
             return f"# Git Context\n\n{self.content}\n"
         elif self.type == 'dependency':
@@ -400,29 +419,42 @@ class ErrorContext:
 class ContextGatherer:
     """Main context gathering coordinator."""
     
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Optional[Path] = None, max_file_lines: int = 1000, max_related_files: int = 5):
         self.project_root = project_root or Path.cwd()
         self.git = GitContext(self.project_root)
         self.dependencies = DependencyAnalyzer(self.project_root)
         self.error_parser = ErrorContext()
+        self.max_file_lines = max_file_lines
+        self.max_related_files = max_related_files
     
     def gather_for_file(
         self,
         file_path: Path,
         include_git: bool = True,
         include_dependencies: bool = True,
-        include_related: bool = True
+        include_related: bool = True,
+        max_lines: Optional[int] = None
     ) -> Context:
-        """Gather context for a specific file operation."""
+        """Gather context for a specific file operation.
+        
+        Args:
+            file_path: Path to the file to gather context for
+            include_git: Include git context
+            include_dependencies: Include dependency information
+            include_related: Include related files
+            max_lines: Maximum lines per file (uses instance default if None)
+        """
         context = Context()
+        max_lines = max_lines or self.max_file_lines
         
         # Add the file itself
         if file_path.exists():
-            context.add(ContextItem(
+            item = ContextItem(
                 type='file',
                 content=file_path.read_text(),
                 metadata={'path': str(file_path)}
-            ))
+            )
+            context.add(item.truncate(max_lines))
         
         # Add git context
         if include_git and self.git.is_git_repo():
@@ -438,21 +470,31 @@ class ContextGatherer:
         self,
         error_text: str,
         file_path: Optional[Path] = None,
-        include_git: bool = True
+        include_git: bool = True,
+        max_lines: Optional[int] = None
     ) -> Context:
-        """Gather context for error debugging."""
+        """Gather context for error debugging.
+        
+        Args:
+            error_text: The error message or traceback
+            file_path: Optional file path related to the error
+            include_git: Include git context
+            max_lines: Maximum lines per file (uses instance default if None)
+        """
         context = Context()
+        max_lines = max_lines or self.max_file_lines
         
         # Add error context
         context.add(self.error_parser.gather(error_text))
         
         # Add file if provided
         if file_path and file_path.exists():
-            context.add(ContextItem(
+            item = ContextItem(
                 type='file',
                 content=file_path.read_text(),
                 metadata={'path': str(file_path)}
-            ))
+            )
+            context.add(item.truncate(max_lines))
         
         # Add git context
         if include_git and self.git.is_git_repo():
@@ -464,15 +506,26 @@ class ContextGatherer:
         self,
         file_path: Path,
         include_git: bool = True,
-        include_tests: bool = True
+        include_tests: bool = True,
+        max_lines: Optional[int] = None
     ) -> Context:
-        """Gather context for code review."""
+        """Gather context for code review.
+        
+        Args:
+            file_path: Path to the file to review
+            include_git: Include git context
+            include_tests: Try to find and include test files
+            max_lines: Maximum lines per file (uses instance default if None)
+        """
         context = self.gather_for_file(
             file_path,
             include_git=include_git,
             include_dependencies=True,
-            include_related=True
+            include_related=True,
+            max_lines=max_lines
         )
+        
+        max_lines = max_lines or self.max_file_lines
         
         # Try to find test file
         if include_tests:
@@ -484,11 +537,13 @@ class ContextGatherer:
             
             for test_file in test_patterns:
                 if test_file.exists():
-                    context.add(ContextItem(
+                    item = ContextItem(
                         type='file',
                         content=test_file.read_text(),
                         metadata={'path': str(test_file), 'is_test': True}
-                    ))
+                    )
+                    context.add(item.truncate(max_lines))
                     break
         
         return context
+    

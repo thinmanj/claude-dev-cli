@@ -31,6 +31,13 @@ class ProjectProfile(BaseModel):
     coding_style: Optional[str] = None  # Preferred coding style
     test_framework: Optional[str] = None  # Preferred test framework
     preferences: Dict[str, str] = Field(default_factory=dict)  # Custom preferences
+    
+    # Context gathering configuration
+    max_context_files: int = 5  # Maximum number of related files to include
+    max_diff_lines: int = 200  # Maximum lines of diff to include
+    max_file_lines: int = 1000  # Maximum lines per file in context
+    include_tests_by_default: bool = True  # Include test files in review context
+    context_depth: int = 2  # How deep to search for related modules
 
 
 class Config:

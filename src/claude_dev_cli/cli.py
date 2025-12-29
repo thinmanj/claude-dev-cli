@@ -461,20 +461,37 @@ def generate() -> None:
 @click.option('-o', '--output', type=click.Path(), help='Output file path')
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
+@click.option('--auto-context', is_flag=True, help='Include dependencies and related files')
 @click.pass_context
 def gen_tests(
     ctx: click.Context,
     file_path: str,
     output: Optional[str],
     api: Optional[str],
-    interactive: bool
+    interactive: bool,
+    auto_context: bool
 ) -> None:
     """Generate pytest tests for a Python file."""
     console = ctx.obj['console']
     
     try:
-        with console.status("[bold blue]Generating tests..."):
-            result = generate_tests(file_path, api_config_name=api)
+        if auto_context:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering context..."):
+                gatherer = ContextGatherer()
+                context = gatherer.gather_for_file(Path(file_path), include_git=False)
+                context_info = context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered (dependencies, related files)[/dim]")
+            
+            # Use context-aware test generation
+            client = ClaudeClient(api_config_name=api)
+            enhanced_prompt = f"{context_info}\n\nPlease generate comprehensive pytest tests for the main file, including fixtures, edge cases, and proper mocking where needed."
+            result = client.call(enhanced_prompt)
+        else:
+            with console.status("[bold blue]Generating tests..."):
+                result = generate_tests(file_path, api_config_name=api)
         
         if interactive:
             # Show initial result
@@ -530,20 +547,37 @@ def gen_tests(
 @click.option('-o', '--output', type=click.Path(), help='Output file path')
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
+@click.option('--auto-context', is_flag=True, help='Include dependencies and related files')
 @click.pass_context
 def gen_docs(
     ctx: click.Context,
     file_path: str,
     output: Optional[str],
     api: Optional[str],
-    interactive: bool
+    interactive: bool,
+    auto_context: bool
 ) -> None:
     """Generate documentation for a Python file."""
     console = ctx.obj['console']
     
     try:
-        with console.status("[bold blue]Generating documentation..."):
-            result = generate_docs(file_path, api_config_name=api)
+        if auto_context:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering context..."):
+                gatherer = ContextGatherer()
+                context = gatherer.gather_for_file(Path(file_path), include_git=False)
+                context_info = context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered (dependencies, related files)[/dim]")
+            
+            # Use context-aware documentation generation
+            client = ClaudeClient(api_config_name=api)
+            enhanced_prompt = f"{context_info}\n\nPlease generate comprehensive documentation for the main file, including API reference, usage examples, and integration notes."
+            result = client.call(enhanced_prompt)
+        else:
+            with console.status("[bold blue]Generating documentation..."):
+                result = generate_docs(file_path, api_config_name=api)
         
         if interactive:
             console.print("\n[bold]Initial Documentation:[/bold]\n")
@@ -816,14 +850,31 @@ def git() -> None:
 
 @git.command('commit')
 @click.option('-a', '--api', help='API config to use')
+@click.option('--auto-context', is_flag=True, help='Include git history and branch context')
 @click.pass_context
-def git_commit(ctx: click.Context, api: Optional[str]) -> None:
+def git_commit(ctx: click.Context, api: Optional[str], auto_context: bool) -> None:
     """Generate commit message from staged changes."""
     console = ctx.obj['console']
     
     try:
-        with console.status("[bold blue]Analyzing changes..."):
-            result = git_commit_message(api_config_name=api)
+        if auto_context:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering context..."):
+                gatherer = ContextGatherer()
+                # Get git context with recent commits and branch info
+                git_context = gatherer.git.gather(include_diff=True)
+                context_info = git_context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered (branch, commits, diff)[/dim]")
+            
+            # Use context-aware commit message generation
+            client = ClaudeClient(api_config_name=api)
+            enhanced_prompt = f"{context_info}\n\nPlease generate a concise, conventional commit message for the staged changes. Follow best practices: imperative mood, clear scope, explain what and why."
+            result = client.call(enhanced_prompt)
+        else:
+            with console.status("[bold blue]Analyzing changes..."):
+                result = git_commit_message(api_config_name=api)
         
         console.print("\n[bold green]Suggested commit message:[/bold green]")
         console.print(Panel(result, border_style="green"))
