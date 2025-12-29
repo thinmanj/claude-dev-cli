@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2024-12-29
+
 ### Added
+- **Workflow Chains**: YAML-based multi-step automation
+  - `cdc workflow run <file>`: Execute workflow from YAML file
+  - `cdc workflow list`: List available workflows
+  - `cdc workflow show <file>`: Show workflow details
+  - `cdc workflow validate <file>`: Validate workflow syntax
+  - Variable interpolation with {{variable}} syntax
+  - Conditional steps with `if` clauses
+  - Approval gates for human-in-the-loop
+  - Continue on error with `continue_on_error` flag
+  - Three step types: command (cdc commands), shell (shell commands), set (variable assignment)
+- **Warp Terminal Integration**: Enhanced output formatting and workflows
+  - `cdc warp export-workflows`: Export Warp workflows for common tasks
+  - `cdc warp export-launch-configs`: Export Warp launch configurations
+  - Block formatting with click-to-run actions
+  - 4 built-in Warp workflows (code review, test generation, refactor, debug)
 - **Interactive Mode for Generation Commands**: Add `--interactive` / `-i` flag to all generation commands
   - `cdc generate tests --interactive`: Iteratively refine generated tests
   - `cdc generate docs --interactive`: Iteratively refine documentation
@@ -15,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `cdc refactor --interactive`: Iteratively improve refactoring suggestions
   - Commands: 'save' to save and exit, 'exit' to discard changes
   - Maintains conversation context for intelligent refinements
+- ROADMAP.md for future feature planning
+
+### Dependencies
+- Added PyYAML >= 6.0.0 for workflow support
 
 ## [0.6.0] - 2024-12-29
 

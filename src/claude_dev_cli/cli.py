@@ -1095,5 +1095,221 @@ def template_use(ctx: click.Context, name: str, api: Optional[str], model: Optio
         sys.exit(1)
 
 
+@main.group()
+def warp() -> None:
+    """Warp terminal integration."""
+    pass
+
+
+@warp.command('export-workflows')
+@click.option('-o', '--output', type=click.Path(), help='Output directory')
+@click.pass_context
+def warp_export_workflows(ctx: click.Context, output: Optional[str]) -> None:
+    """Export Warp workflows for claude-dev-cli commands."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.warp_integration import export_builtin_workflows
+        
+        config = Config()
+        output_dir = Path(output) if output else config.config_dir / "warp" / "workflows"
+        
+        created_files = export_builtin_workflows(output_dir)
+        
+        console.print(f"[green]✓[/green] Exported {len(created_files)} Warp workflows to:")
+        console.print(f"  {output_dir}")
+        console.print("\n[bold]Workflows:[/bold]")
+        for file in created_files:
+            console.print(f"  • {file.name}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@warp.command('export-launch-configs')
+@click.option('-o', '--output', type=click.Path(), help='Output file path')
+@click.pass_context
+def warp_export_launch_configs(ctx: click.Context, output: Optional[str]) -> None:
+    """Export Warp launch configurations."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.warp_integration import export_launch_configs
+        
+        config = Config()
+        output_path = Path(output) if output else config.config_dir / "warp" / "launch_configs.json"
+        
+        export_launch_configs(output_path)
+        
+        console.print(f"[green]✓[/green] Exported Warp launch configurations to:")
+        console.print(f"  {output_path}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
+def workflow() -> None:
+    """Manage and run workflows."""
+    pass
+
+
+@workflow.command('run')
+@click.argument('workflow_file', type=click.Path(exists=True))
+@click.option('--var', '-v', multiple=True, help='Set variables (key=value)')
+@click.pass_context
+def workflow_run(
+    ctx: click.Context,
+    workflow_file: str,
+    var: tuple
+) -> None:
+    """Run a workflow from YAML file."""
+    console = ctx.obj['console']
+    
+    # Parse variables
+    variables = {}
+    for v in var:
+        if '=' in v:
+            key, value = v.split('=', 1)
+            variables[key] = value
+    
+    try:
+        from claude_dev_cli.workflows import WorkflowEngine
+        
+        engine = WorkflowEngine(console=console)
+        workflow_path = Path(workflow_file)
+        
+        context = engine.execute(workflow_path, initial_vars=variables)
+        
+        # Show summary
+        if context.step_results:
+            console.print("\n[bold]Results Summary:[/bold]")
+            for step_name, result in context.step_results.items():
+                status = "[green]✓[/green]" if result.success else "[red]✗[/red]"
+                console.print(f"{status} {step_name}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@workflow.command('list')
+@click.pass_context
+def workflow_list(ctx: click.Context) -> None:
+    """List available workflows."""
+    console = ctx.obj['console']
+    config = Config()
+    workflow_dir = config.config_dir / "workflows"
+    
+    from claude_dev_cli.workflows import list_workflows
+    workflows = list_workflows(workflow_dir)
+    
+    if not workflows:
+        console.print("[yellow]No workflows found.[/yellow]")
+        console.print(f"\nCreate workflows in: {workflow_dir}")
+        return
+    
+    from rich.table import Table
+    
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Name", style="cyan")
+    table.add_column("Steps", style="yellow")
+    table.add_column("Description")
+    
+    for wf in workflows:
+        table.add_row(
+            wf['name'],
+            str(wf['steps']),
+            wf['description']
+        )
+    
+    console.print(table)
+    console.print(f"\n[dim]Workflow directory: {workflow_dir}[/dim]")
+
+
+@workflow.command('show')
+@click.argument('workflow_file', type=click.Path(exists=True))
+@click.pass_context
+def workflow_show(ctx: click.Context, workflow_file: str) -> None:
+    """Show workflow details."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.workflows import WorkflowEngine
+        
+        engine = WorkflowEngine(console=console)
+        workflow = engine.load_workflow(Path(workflow_file))
+        
+        console.print(Panel(
+            f"[bold]{workflow.get('name', 'Unnamed')}[/bold]\n\n"
+            f"[dim]{workflow.get('description', 'No description')}[/dim]\n\n"
+            f"Steps: [yellow]{len(workflow.get('steps', []))}[/yellow]",
+            title="Workflow Info",
+            border_style="blue"
+        ))
+        
+        # Show steps
+        steps = workflow.get('steps', [])
+        if steps:
+            console.print("\n[bold]Steps:[/bold]\n")
+            for i, step in enumerate(steps, 1):
+                step_name = step.get('name', f'step-{i}')
+                step_type = 'command' if 'command' in step else 'shell' if 'shell' in step else 'set'
+                console.print(f"  {i}. [cyan]{step_name}[/cyan] ({step_type})")
+                
+                if step.get('approval_required'):
+                    console.print(f"     [yellow]⚠ Requires approval[/yellow]")
+                if 'if' in step:
+                    console.print(f"     [dim]Condition: {step['if']}[/dim]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@workflow.command('validate')
+@click.argument('workflow_file', type=click.Path(exists=True))
+@click.pass_context
+def workflow_validate(ctx: click.Context, workflow_file: str) -> None:
+    """Validate workflow syntax."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.workflows import WorkflowEngine
+        
+        engine = WorkflowEngine(console=console)
+        workflow = engine.load_workflow(Path(workflow_file))
+        
+        # Basic validation
+        errors = []
+        
+        if 'name' not in workflow:
+            errors.append("Missing 'name' field")
+        
+        if 'steps' not in workflow:
+            errors.append("Missing 'steps' field")
+        elif not isinstance(workflow['steps'], list):
+            errors.append("'steps' must be a list")
+        else:
+            for i, step in enumerate(workflow['steps'], 1):
+                if not any(k in step for k in ['command', 'shell', 'set']):
+                    errors.append(f"Step {i}: Must have 'command', 'shell', or 'set'")
+        
+        if errors:
+            console.print("[red]✗ Validation failed:[/red]\n")
+            for error in errors:
+                console.print(f"  • {error}")
+            sys.exit(1)
+        else:
+            console.print(f"[green]✓[/green] Workflow is valid: {workflow.get('name')}")
+            console.print(f"  Steps: {len(workflow.get('steps', []))}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     main(obj={})

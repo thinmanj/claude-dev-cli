@@ -14,10 +14,10 @@ Future development plans for claude-dev-cli.
 - ✅ TOON format support
 - ✅ Diff editor plugin
 
-## Next: v0.7.0 - AI Workflow Integration
+## Current: v0.7.0 - AI Workflow Integration (✅ COMPLETED)
 
 ### 1. Interactive Mode for Generation Commands
-**Status**: ✅ Completed (v0.6.1)
+**Status**: ✅ Completed (v0.7.0)
 
 Add `--interactive` flag to all generation commands for iterative refinement:
 - ✅ `cdc generate tests --interactive`: Review and refine tests before saving
@@ -26,34 +26,41 @@ Add `--interactive` flag to all generation commands for iterative refinement:
 - ✅ `cdc generate docs --interactive`: Refine documentation interactively
 
 ### 2. Workflow Chains
-**Status**: Planned
+**Status**: ✅ Completed (v0.7.0)
 
 Chain multiple AI operations for complex workflows:
-- YAML-based workflow definitions
-- Step chaining with variable passing
-- Conditional logic and approval gates
-- Rollback support
-- CLI: `cdc workflow run <name>`
+- ✅ YAML-based workflow definitions
+- ✅ Step chaining with variable passing
+- ✅ Conditional logic and approval gates
+- ✅ Three step types: command, shell, set
+- ✅ CLI: `cdc workflow run/list/show/validate`
 
 **Example**:
 ```yaml
-# review-fix-test.yaml
+name: "Review and Refactor"
 steps:
-  - review: {file: "{{target}}"}
-  - ask: "Fix issues: {{review.output}}"
-  - generate tests: {file: "{{target}}"}
-  - git commit: {if: "{{tests.passed}}"}
+  - name: review
+    command: review
+    args: {file: "{{target}}"}
+  - name: refactor
+    command: refactor
+    args: {file: "{{target}}"}
+    approval_required: true
+  - name: commit
+    command: git commit
+    if: "{{refactor.success}}"
 ```
 
 ### 3. Warp Terminal Integration
-**Status**: Planned
+**Status**: ✅ Completed (v0.7.0)
 
 Deep integration with Warp features:
-- Warp block formatting for outputs
-- Warp workflow file generation
-- Launch configuration templates
-- Click-to-apply actions in Warp
-- Warp Drive compatibility for team sharing
+- ✅ Warp block formatting for outputs
+- ✅ Warp workflow file generation
+- ✅ Launch configuration templates
+- ✅ Click-to-apply actions in Warp
+- ✅ CLI: `cdc warp export-workflows/export-launch-configs`
+- ✅ 4 built-in workflows (review, test, refactor, debug)
 
 ### 4. Context-Aware Operations
 **Status**: Planned
@@ -64,6 +71,8 @@ Automatic context gathering:
 - Dependency context (package.json, requirements.txt)
 - Error context capture
 - Project memory
+
+## Next: v0.8.0 - Context & Intelligence
 
 ## Future: v0.8.0 - Team & Collaboration
 

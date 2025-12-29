@@ -1,0 +1,29 @@
+name: "Review and Refactor Workflow"
+description: "Review code, get refactoring suggestions, and optionally commit changes"
+
+steps:
+  - name: code-review
+    command: review
+    args:
+      file: "{{target_file}}"
+    output_var: review_result
+
+  - name: show-review
+    shell: echo "Review completed. Check for issues above."
+
+  - name: refactor
+    command: refactor
+    args:
+      file: "{{target_file}}"
+    output_var: refactor_result
+    approval_required: true
+
+  - name: run-tests
+    shell: "pytest tests/test_{{target_file}}"
+    continue_on_error: true
+    output_var: test_result
+
+  - name: commit-changes
+    command: git commit
+    if: "{{test_result.success}}"
+    approval_required: true
