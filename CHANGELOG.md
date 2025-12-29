@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2024-12-29
+
+### Added
+- **Custom Prompt Templates**: Reusable prompt templates with variable substitution
+  - 8 built-in templates for common tasks (code review, testing, debugging, etc.)
+  - `cdc template list` to view all templates with filtering
+  - `cdc template show <name>` to view template details
+  - `cdc template add <name>` to create custom templates
+  - `cdc template delete <name>` to remove user templates
+  - `cdc template use <name>` for interactive template execution
+  - Variable substitution using {{variable}} syntax
+  - Category organization (review, testing, debugging, optimization, etc.)
+  - Protection against overriding/deleting built-in templates
+- Template storage in `~/.claude-dev-cli/templates.json`
+- Comprehensive test suite for templates (24 new tests, 163 total)
+
+### Technical Details
+- Template class with variable extraction and rendering
+- TemplateManager for CRUD operations and persistence
+- Built-in templates covering common developer workflows
+- JSON-based storage for user templates
+
 ## [0.5.0] - 2024-12-28
 
 ### Added

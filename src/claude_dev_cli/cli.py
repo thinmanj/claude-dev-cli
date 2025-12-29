@@ -25,6 +25,7 @@ from claude_dev_cli.usage import UsageTracker
 from claude_dev_cli import toon_utils
 from claude_dev_cli.plugins import load_plugins
 from claude_dev_cli.history import ConversationHistory, Conversation
+from claude_dev_cli.template_manager import TemplateManager, Template
 
 console = Console()
 
@@ -751,6 +752,209 @@ def toon_info(ctx: click.Context) -> None:
         console.print("• Reduce API costs by 30-60%")
         console.print("• Faster LLM response times")
         console.print("• Same data, fewer tokens")
+
+
+@main.group()
+def template() -> None:
+    """Manage custom prompt templates."""
+    pass
+
+
+@template.command('list')
+@click.option('-c', '--category', help='Filter by category')
+@click.option('--builtin', is_flag=True, help='Show only built-in templates')
+@click.option('--user', is_flag=True, help='Show only user templates')
+@click.pass_context
+def template_list(
+    ctx: click.Context,
+    category: Optional[str],
+    builtin: bool,
+    user: bool
+) -> None:
+    """List available templates."""
+    console = ctx.obj['console']
+    config = Config()
+    manager = TemplateManager(config.config_dir)
+    
+    templates = manager.list_templates(
+        category=category,
+        builtin_only=builtin,
+        user_only=user
+    )
+    
+    if not templates:
+        console.print("[yellow]No templates found.[/yellow]")
+        return
+    
+    from rich.table import Table
+    
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Name", style="cyan")
+    table.add_column("Category", style="green")
+    table.add_column("Variables", style="yellow")
+    table.add_column("Type", style="blue")
+    table.add_column("Description")
+    
+    for tmpl in templates:
+        vars_display = ", ".join(tmpl.variables) if tmpl.variables else "-"
+        type_display = "🔒 Built-in" if tmpl.builtin else "📝 User"
+        table.add_row(
+            tmpl.name,
+            tmpl.category,
+            vars_display,
+            type_display,
+            tmpl.description
+        )
+    
+    console.print(table)
+    
+    # Show categories
+    categories = manager.get_categories()
+    console.print(f"\n[dim]Categories: {', '.join(categories)}[/dim]")
+
+
+@template.command('show')
+@click.argument('name')
+@click.pass_context
+def template_show(ctx: click.Context, name: str) -> None:
+    """Show template details."""
+    console = ctx.obj['console']
+    config = Config()
+    manager = TemplateManager(config.config_dir)
+    
+    tmpl = manager.get_template(name)
+    if not tmpl:
+        console.print(f"[red]Template not found: {name}[/red]")
+        sys.exit(1)
+    
+    console.print(Panel(
+        f"[bold]{tmpl.name}[/bold]\n\n"
+        f"[dim]{tmpl.description}[/dim]\n\n"
+        f"Category: [green]{tmpl.category}[/green]\n"
+        f"Type: {'🔒 Built-in' if tmpl.builtin else '📝 User'}\n"
+        f"Variables: [yellow]{', '.join(tmpl.variables) if tmpl.variables else 'None'}[/yellow]",
+        title="Template Info",
+        border_style="blue"
+    ))
+    
+    console.print("\n[bold]Content:[/bold]\n")
+    console.print(Panel(tmpl.content, border_style="dim"))
+
+
+@template.command('add')
+@click.argument('name')
+@click.option('-c', '--content', help='Template content (or use stdin)')
+@click.option('-d', '--description', help='Template description')
+@click.option('--category', default='general', help='Template category')
+@click.pass_context
+def template_add(
+    ctx: click.Context,
+    name: str,
+    content: Optional[str],
+    description: Optional[str],
+    category: str
+) -> None:
+    """Add a new template."""
+    console = ctx.obj['console']
+    config = Config()
+    manager = TemplateManager(config.config_dir)
+    
+    # Get content from stdin if not provided
+    if not content:
+        if sys.stdin.isatty():
+            console.print("[yellow]Enter template content (Ctrl+D to finish):[/yellow]")
+        content = sys.stdin.read().strip()
+    
+    if not content:
+        console.print("[red]Error: No content provided[/red]")
+        sys.exit(1)
+    
+    try:
+        tmpl = Template(
+            name=name,
+            content=content,
+            description=description,
+            category=category
+        )
+        manager.add_template(tmpl)
+        
+        console.print(f"[green]✓[/green] Template added: {name}")
+        if tmpl.variables:
+            console.print(f"[dim]Variables: {', '.join(tmpl.variables)}[/dim]")
+    
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@template.command('delete')
+@click.argument('name')
+@click.pass_context
+def template_delete(ctx: click.Context, name: str) -> None:
+    """Delete a user template."""
+    console = ctx.obj['console']
+    config = Config()
+    manager = TemplateManager(config.config_dir)
+    
+    try:
+        if manager.delete_template(name):
+            console.print(f"[green]✓[/green] Template deleted: {name}")
+        else:
+            console.print(f"[red]Template not found: {name}[/red]")
+            sys.exit(1)
+    
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@template.command('use')
+@click.argument('name')
+@click.option('-a', '--api', help='API config to use')
+@click.option('-m', '--model', help='Claude model to use')
+@click.pass_context
+def template_use(ctx: click.Context, name: str, api: Optional[str], model: Optional[str]) -> None:
+    """Use a template with interactive variable input."""
+    console = ctx.obj['console']
+    config = Config()
+    manager = TemplateManager(config.config_dir)
+    
+    tmpl = manager.get_template(name)
+    if not tmpl:
+        console.print(f"[red]Template not found: {name}[/red]")
+        sys.exit(1)
+    
+    # Get variable values
+    variables = {}
+    if tmpl.variables:
+        console.print(f"\n[bold]Template: {name}[/bold]")
+        console.print(f"[dim]{tmpl.description}[/dim]\n")
+        
+        for var in tmpl.variables:
+            value = console.input(f"[cyan]{var}:[/cyan] ").strip()
+            variables[var] = value
+    
+    # Check for missing variables
+    missing = tmpl.get_missing_variables(**variables)
+    if missing:
+        console.print(f"[red]Missing required variables: {', '.join(missing)}[/red]")
+        sys.exit(1)
+    
+    # Render template
+    prompt = tmpl.render(**variables)
+    
+    # Call Claude
+    try:
+        client = ClaudeClient(api_config_name=api)
+        
+        console.print("\n[bold green]Claude:[/bold green] ", end='')
+        for chunk in client.call_streaming(prompt, model=model):
+            console.print(chunk, end='')
+        console.print()
+    
+    except Exception as e:
+        console.print(f"\n[red]Error: {e}[/red]")
+        sys.exit(1)
 
 
 if __name__ == '__main__':

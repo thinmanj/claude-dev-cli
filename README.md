@@ -29,6 +29,12 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 - **Interactive**: Chat mode with conversation history
 - **Streaming**: Real-time responses
 
+### 📝 Custom Templates
+- **Built-in Templates**: 8 pre-built templates for common tasks (code review, testing, debugging, etc.)
+- **User Templates**: Create and manage your own reusable prompt templates
+- **Variable Substitution**: Use {{variable}} placeholders for dynamic content
+- **Categories**: Organize templates by category (review, testing, debugging, etc.)
+
 ### 🎒 TOON Format Support (Optional)
 - **Token Reduction**: 30-60% fewer tokens than JSON
 - **Cost Savings**: Reduce API costs significantly
@@ -113,7 +119,44 @@ git add .
 cdc git commit
 ```
 
-### 4. Usage Tracking
+### 5. Custom Templates
+
+```bash
+# List all templates (built-in and user)
+cdc template list
+
+# Show template details
+cdc template show code-review
+
+# Add a custom template
+cdc template add my-review -c "Review this code for {{focus}}: {{code}}" \
+  -d "Custom review template" --category review
+
+# Use a template (interactive variable input)
+cdc template use debug-error
+
+# Delete a user template
+cdc template delete my-review
+
+# Filter by category
+cdc template list --category review
+
+# Show only user templates
+cdc template list --user
+```
+
+#### Built-in Templates
+
+- **code-review**: Comprehensive code review with customizable focus
+- **code-review-security**: Security-focused code review
+- **test-strategy**: Generate testing strategy and test cases
+- **debug-error**: Debug error with context
+- **optimize-performance**: Performance optimization analysis
+- **refactor-clean**: Clean code refactoring
+- **explain-code**: Detailed code explanation
+- **api-design**: API design assistance
+
+### 6. Usage Tracking
 
 ```bash
 # View all usage
@@ -126,7 +169,7 @@ cdc usage --days 7
 cdc usage --api client
 ```
 
-### 5. TOON Format (Optional - Reduces Tokens by 30-60%)
+### 7. TOON Format (Optional - Reduces Tokens by 30-60%)
 
 ```bash
 # Check if TOON is installed
@@ -278,6 +321,16 @@ When using a client's Enterprise API:
 | `cdc review <file>` | Review code |
 | `cdc debug -f <file> -e <error>` | Debug code |
 | `cdc refactor <file>` | Refactoring suggestions |
+
+### Templates
+
+| Command | Description |
+|---------|-------------|
+| `cdc template list` | List all templates |
+| `cdc template show <name>` | Show template details |
+| `cdc template add <name>` | Add new template |
+| `cdc template delete <name>` | Delete user template |
+| `cdc template use <name>` | Use template interactively |
 
 ### Git Helpers
 
