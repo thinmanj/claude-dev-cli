@@ -2,19 +2,24 @@
 
 Future development plans for claude-dev-cli.
 
-## Current Version: 0.6.0
+## Current Version: 0.8.3
 
 **Completed Features:**
 - ✅ Multi-API key management with secure storage
 - ✅ Developer tools (test gen, review, debug, refactor)
 - ✅ Usage tracking and cost monitoring
 - ✅ Shell completion (bash/zsh/fish)
-- ✅ Conversation history with export
+- ✅ Conversation history with export and summarization
 - ✅ Custom prompt templates
-- ✅ TOON format support
+- ✅ TOON format support (30-60% token reduction)
 - ✅ Diff editor plugin
+- ✅ Workflow chains (YAML-based automation)
+- ✅ Warp terminal integration
+- ✅ Context intelligence with auto-gathering
+- ✅ Multi-language error parsing (Python/JS/Go/Rust/Java)
+- ✅ Conversation summarization (30-50% cost reduction)
 
-## Current: v0.7.0 - AI Workflow Integration (✅ COMPLETED)
+## Recent: v0.7.0 - AI Workflow Integration (✅ COMPLETED)
 
 ### 1. Interactive Mode for Generation Commands
 **Status**: ✅ Completed (v0.7.0)
@@ -63,18 +68,40 @@ Deep integration with Warp features:
 - ✅ 4 built-in workflows (review, test, refactor, debug)
 
 ### 4. Context-Aware Operations
-**Status**: Planned
+**Status**: ✅ Completed (v0.8.0-0.8.2)
 
 Automatic context gathering:
-- Auto-include relevant files
-- Git context (commits, diffs, branches)
-- Dependency context (package.json, requirements.txt)
-- Error context capture
-- Project memory
+- ✅ Auto-include relevant files with `--auto-context`
+- ✅ Git context (commits, diffs, branches)
+- ✅ Dependency context (package.json, requirements.txt, go.mod, Cargo.toml)
+- ✅ Error context capture with multi-language parsing
+- ✅ Project memory and preferences
+- ✅ Context preview with `cdc context summary`
+- ✅ Smart truncation with configurable limits
 
-## Next: v0.8.0 - Context & Intelligence
+## Recent: v0.8.0 - Context Intelligence (✅ COMPLETED)
 
-## Future: v0.8.0 - Team & Collaboration
+**Features**:
+- ✅ `--auto-context` flag for 7 commands
+- ✅ Git, dependency, and file relationship analysis
+- ✅ Error traceback parsing (Python/JS/Go/Rust/Java)
+- ✅ Context preview and token estimation
+- ✅ Global and per-project configuration
+
+## Recent: v0.8.3 - Conversation Summarization (✅ COMPLETED)
+
+**Features**:
+- ✅ Manual summarization: `cdc history summarize`
+- ✅ Automatic summarization in interactive mode
+- ✅ 30-50% token reduction in long conversations
+- ✅ Smart compression with rolling summaries
+- ✅ Configurable thresholds and behavior
+- ✅ Token savings display
+- ✅ 257 tests passing (39 new)
+
+## Next: v0.9.0 - Team & Collaboration
+
+## Future: Team & Collaboration Features
 
 ### Team Features
 - Shared templates via Git

@@ -57,7 +57,7 @@ brew tap thinmanj/tap
 brew install claude-dev-cli
 
 # Verify
-cdc --version  # Should show 0.8.2
+cdc --version  # Should show 0.8.3
 ```
 
 ### 4. Update README in Tap Repository
@@ -103,10 +103,10 @@ brew uninstall claude-dev-cli
 **Formula Location**: `/Volumes/Projects/claude-dev-cli/Formula/claude-dev-cli.rb`
 
 **Formula Details**:
-- Version: 0.8.2
+- Version: 0.8.3
 - Python: 3.11
 - Source: PyPI tarball
-- SHA256: c324a9bac6ba4bd43aaff9fa7e8260bfebaf0a3d0ca5b5485597018cd893be61
+- SHA256: b47a8aa09714d088d653518e851b24f588ced88713457ca789b4e48b5838c297
 
 **Local Testing**: ✅ PASSED
 - Installation works
