@@ -42,7 +42,7 @@ class Conversation:
         updated_at: Optional[datetime] = None,
         summary: Optional[str] = None
     ):
-        self.conversation_id = conversation_id or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        self.conversation_id = conversation_id or datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
         self.created_at = created_at or datetime.utcnow()
         self.updated_at = updated_at or datetime.utcnow()
         self.summary = summary  # AI-generated summary of older messages
