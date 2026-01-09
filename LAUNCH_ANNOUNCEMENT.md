@@ -7,13 +7,14 @@ Use these templates to announce claude-dev-cli on various platforms.
 ## Twitter/X
 
 ```
-🎉 Introducing claude-dev-cli v0.8.2!
+🎉 Introducing claude-dev-cli v0.8.3!
 
 AI-powered CLI for developers with Claude API:
 
 ✨ Multi-API routing (personal/client/enterprise keys)
 ✨ Code review, test generation, debugging
 ✨ Context intelligence with auto-gathering
+✨ Conversation summarization (30-50% cost savings)
 ✨ Multi-language error parsing (Python/JS/Go/Rust/Java)
 ✨ Usage tracking & cost control
 
@@ -21,7 +22,7 @@ Install:
 🍺 brew install thinmanj/tap/claude-dev-cli
 🐍 pip install claude-dev-cli
 
-218 tests passing | MIT License
+257 tests passing | MIT License
 
 https://github.com/thinmanj/claude-dev-cli
 
@@ -35,12 +36,13 @@ https://github.com/thinmanj/claude-dev-cli
 ```
 🚀 Launching claude-dev-cli: AI-Powered Development Assistant
 
-I'm excited to share claude-dev-cli v0.8.2, a professional CLI tool for developers using Claude AI.
+I'm excited to share claude-dev-cli v0.8.3, a professional CLI tool for developers using Claude AI.
 
 🔑 Key Features:
 • Multi-API Key Management: Route tasks between personal, client, and enterprise API keys
 • Developer Workflows: Code review, test generation, debugging, refactoring
 • Context Intelligence: Automatically gathers git history, dependencies, and related files
+• Conversation Summarization: 30-50% cost reduction in long conversations
 • Multi-Language Support: Parse errors in Python, JavaScript, Go, Rust, and Java
 • Cost Control: Track usage and costs per API key
 
@@ -49,7 +51,7 @@ brew install thinmanj/tap/claude-dev-cli
 pip install claude-dev-cli
 
 🧪 Battle-Tested:
-218 tests passing, fully documented, MIT licensed
+257 tests passing, fully documented, MIT licensed
 
 Perfect for:
 ✓ Freelancers managing multiple client projects
@@ -91,8 +93,9 @@ What makes it different:
 
 Technical details:
 - Python 3.9+, fully typed with mypy
-- 218 tests passing
+- 257 tests passing
 - Secure key storage (system keyring)
+- Conversation summarization (30-50% cost reduction)
 - MIT licensed
 
 Installation:
@@ -182,7 +185,8 @@ cdc generate tests mymodule.py -o tests/test_mymodule.py
 **Technical Details:**
 - Python 3.9+
 - Fully typed with mypy
-- 218 tests passing
+- 257 tests passing
+- Conversation summarization (30-50% cost reduction)
 - MIT licensed
 - Docs: [QUICKSTART.md](https://github.com/thinmanj/claude-dev-cli/blob/master/QUICKSTART.md)
 
@@ -237,7 +241,7 @@ brew install thinmanj/tap/claude-dev-cli
 pip install claude-dev-cli
 ```
 
-218 tests | MIT | Docs: https://github.com/thinmanj/claude-dev-cli
+257 tests | MIT | Docs: https://github.com/thinmanj/claude-dev-cli
 
 Feedback welcome!
 ```
@@ -327,7 +331,7 @@ Parse errors from Python, JavaScript, Go, Rust, and Java with precise stack trac
 
 Perfect for freelancers, agencies, and development teams who want professional AI tooling.
 
-218 tests passing | MIT License | Available via Homebrew and pip
+257 tests passing | MIT License | Available via Homebrew and pip
 ```
 
 **First Comment:**
@@ -340,7 +344,7 @@ I built claude-dev-cli because existing Claude CLI tools were too basic. As a de
 - Cost tracking (know what you're spending)
 - Real dev commands (not just chat)
 
-The tool has 218 tests and is battle-tested across multiple projects. 
+The tool has 257 tests and is battle-tested across multiple projects.
 
 Would love your feedback! What features would make this more useful for your workflow?
 
@@ -358,9 +362,10 @@ AI-powered CLI for developers with some unique features:
 
 ✨ Multi-API routing (personal/client keys)
 ✨ Context intelligence (auto-gathers git/deps/files)  
+✨ Conversation summarization (30-50% cost savings)
 ✨ Multi-language error parsing
 ✨ Usage & cost tracking
-✨ 218 tests passing
+✨ 257 tests passing
 
 Install: `brew install thinmanj/tap/claude-dev-cli`
 
