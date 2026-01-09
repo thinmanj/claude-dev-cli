@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Conversations can now have both a summary and recent messages
 - `should_summarize()` method checks both token threshold and minimum message count
 - Auto-save in interactive mode triggers after summarization
+- Conversation IDs now include microseconds to prevent collisions
+
+### Testing
+- Added 39 new tests for conversation summarization
+- Total: 257 tests (was 218)
+- Test coverage for Message, Conversation, ConversationHistory classes
+- Mock-based tests for API summarization calls
+- Persistence and data integrity tests
 
 ## [0.8.2] - 2025-01-09
 

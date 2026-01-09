@@ -180,7 +180,80 @@ cdc ask -f src/api.py --auto-context "how can I improve error handling?"
 # ✓ Git history
 ```
 
-## 📝 Level 4: Templates (20 minutes)
+## 💬 Level 4: Conversation History & Summarization (NEW in v0.8.3)
+
+### Manage Conversation History
+
+```bash
+# List recent conversations
+cdc history list
+
+# Search through conversations
+cdc history list --search "python decorators"
+
+# Export a conversation
+cdc history export 20240109_143022 -o my-chat.md
+
+# Delete old conversations
+cdc history delete 20240109_143022
+```
+
+### Manual Summarization (Reduce Token Usage)
+
+```bash
+# Summarize the latest conversation
+cdc history summarize --latest
+
+# Before:
+# Messages: 20 | Estimated tokens: 12,500
+
+# After:
+# Messages: 4 | Tokens: 5,200 (7,300 saved, 58.4%)
+
+# Summarize specific conversation
+cdc history summarize 20240109_143022
+
+# Keep more recent messages
+cdc history summarize --latest --keep-recent 6
+```
+
+### Auto-Summarization in Interactive Mode
+
+```bash
+# Start interactive mode
+cdc interactive
+
+# After ~8,000 tokens, auto-summarization kicks in:
+# ⚠ Conversation getting long, summarizing older messages...
+# ✓ Summarized older messages (~4,200 tokens saved)
+
+# Your recent messages are kept
+# Older messages are compressed into a summary
+# Continue chatting without hitting token limits!
+```
+
+**Cost Savings:**
+- Reduces API costs by 30-50% in long conversations
+- Keeps conversations manageable
+- Maintains context through rolling summaries
+- Automatic when threshold is reached (8,000 tokens)
+
+### Configure Summarization
+
+Edit `~/.claude-dev-cli/config.json`:
+
+```json
+{
+  "summarization": {
+    "auto_summarize": true,
+    "threshold_tokens": 8000,
+    "keep_recent_messages": 4,
+    "summary_max_words": 300
+  }
+}
+```
+
+## 📝 Level 5: Templates (20 minutes)
 
 ### Use Built-in Templates
 
