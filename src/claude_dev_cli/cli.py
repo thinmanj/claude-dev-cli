@@ -884,6 +884,107 @@ def git_commit(ctx: click.Context, api: Optional[str], auto_context: bool) -> No
         sys.exit(1)
 
 
+@main.group()
+def context() -> None:
+    """Context gathering tools and information."""
+    pass
+
+
+@context.command('summary')
+@click.argument('file_path', type=click.Path(exists=True))
+@click.option('--include-git/--no-git', default=True, help='Include git context')
+@click.option('--include-deps/--no-deps', default=True, help='Include dependencies')
+@click.option('--include-tests/--no-tests', default=True, help='Include test files')
+@click.pass_context
+def context_summary(
+    ctx: click.Context,
+    file_path: str,
+    include_git: bool,
+    include_deps: bool,
+    include_tests: bool
+) -> None:
+    """Show what context would be gathered for a file."""
+    from claude_dev_cli.context import ContextGatherer
+    from rich.table import Table
+    
+    console = ctx.obj['console']
+    
+    try:
+        file_path_obj = Path(file_path)
+        gatherer = ContextGatherer()
+        
+        # Gather context
+        with console.status("[bold blue]Analyzing context..."):
+            context = gatherer.gather_for_review(
+                file_path_obj,
+                include_git=include_git,
+                include_tests=include_tests
+            )
+        
+        # Display summary
+        console.print(f"\n[bold cyan]Context Summary for:[/bold cyan] {file_path}\n")
+        
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Type", style="cyan")
+        table.add_column("Content", style="white")
+        table.add_column("Size", justify="right", style="yellow")
+        table.add_column("Lines", justify="right", style="green")
+        table.add_column("Truncated", justify="center", style="red")
+        
+        total_chars = 0
+        total_lines = 0
+        
+        for item in context.items:
+            lines = len(item.content.split('\n'))
+            chars = len(item.content)
+            truncated = "✓" if item.metadata.get('truncated') else ""
+            
+            # Format content preview
+            if item.type == 'file':
+                content = item.metadata.get('path', 'unknown')
+                if item.metadata.get('is_test'):
+                    content += " [TEST]"
+            elif item.type == 'git':
+                branch = item.metadata.get('branch', 'unknown')
+                modified = item.metadata.get('modified_count', 0)
+                content = f"Branch: {branch}, {modified} modified files"
+            elif item.type == 'dependency':
+                dep_files = item.metadata.get('dependency_files', [])
+                content = f"{len(dep_files)} dependency files"
+            else:
+                content = item.type
+            
+            table.add_row(
+                item.type.title(),
+                content[:60] + "..." if len(content) > 60 else content,
+                f"{chars:,}",
+                f"{lines:,}",
+                truncated
+            )
+            
+            total_chars += chars
+            total_lines += lines
+        
+        console.print(table)
+        
+        # Show totals
+        console.print(f"\n[bold]Total:[/bold]")
+        console.print(f"  Characters: [yellow]{total_chars:,}[/yellow]")
+        console.print(f"  Lines: [green]{total_lines:,}[/green]")
+        console.print(f"  Estimated tokens: [cyan]~{total_chars // 4:,}[/cyan] (rough estimate)")
+        
+        # Show any truncation warnings
+        truncated_items = [item for item in context.items if item.metadata.get('truncated')]
+        if truncated_items:
+            console.print(f"\n[yellow]⚠ {len(truncated_items)} item(s) truncated to fit size limits[/yellow]")
+        
+        console.print(f"\n[dim]Use --auto-context with commands to include this context[/dim]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
 @main.command('usage')
 @click.option('--days', type=int, help='Filter by days')
 @click.option('--api', help='Filter by API config')

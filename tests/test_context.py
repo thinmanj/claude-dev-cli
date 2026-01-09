@@ -410,6 +410,31 @@ import json.decoder
 class TestErrorContext:
     """Tests for ErrorContext class."""
     
+    def test_detect_language_python(self) -> None:
+        """Test Python language detection."""
+        error_text = "Traceback (most recent call last):\n  File \"test.py\", line 10"
+        assert ErrorContext.detect_language(error_text) == 'python'
+    
+    def test_detect_language_javascript(self) -> None:
+        """Test JavaScript language detection."""
+        error_text = "Error: test\n    at func (app.js:10:5)"
+        assert ErrorContext.detect_language(error_text) == 'javascript'
+    
+    def test_detect_language_go(self) -> None:
+        """Test Go language detection."""
+        error_text = "panic: test\n\tmain.go:15"
+        assert ErrorContext.detect_language(error_text) == 'go'
+    
+    def test_detect_language_rust(self) -> None:
+        """Test Rust language detection."""
+        error_text = "thread 'main' panicked at 'test', main.rs:10:5"
+        assert ErrorContext.detect_language(error_text) == 'rust'
+    
+    def test_detect_language_java(self) -> None:
+        """Test Java language detection."""
+        error_text = "Exception in thread\nat Test.java:10"
+        assert ErrorContext.detect_language(error_text) == 'java'
+    
     def test_parse_simple_traceback(self) -> None:
         """Test parsing a simple Python traceback."""
         error_text = """
@@ -505,6 +530,117 @@ TypeError: execute() missing 1 required positional argument
         assert "TypeError" in context_item.content
         assert "main.py" in context_item.content
         assert "error_type" in context_item.metadata
+    
+    def test_parse_javascript_stack(self) -> None:
+        """Test JavaScript stack trace parsing."""
+        error_text = """
+TypeError: Cannot read property 'foo' of undefined
+    at myFunction (app.js:42:15)
+    at main (index.js:10:5)
+    at startup.js:100:1
+"""
+        
+        parsed = ErrorContext.parse_javascript_stack(error_text)
+        
+        assert parsed['language'] == 'javascript'
+        assert parsed['error_type'] == 'TypeError'
+        assert "Cannot read property" in parsed['error_message']
+        assert len(parsed['frames']) == 3
+        
+        frame1 = parsed['frames'][0]
+        assert frame1['file'] == 'app.js'
+        assert frame1['line'] == 42
+        assert frame1['column'] == 15
+        assert frame1['function'] == 'myFunction'
+    
+    def test_parse_go_panic(self) -> None:
+        """Test Go panic trace parsing."""
+        error_text = """
+panic: runtime error: index out of range
+
+goroutine 1 [running]:
+main.process()
+	/path/to/main.go:45 +0x1a3
+main.main()
+	/path/to/main.go:20 +0x2e
+"""
+        
+        parsed = ErrorContext.parse_go_panic(error_text)
+        
+        assert parsed['language'] == 'go'
+        assert parsed['error_type'] == 'panic'
+        assert 'index out of range' in parsed['error_message']
+        assert len(parsed['frames']) >= 2
+        
+        # Check that we found the files
+        files = [f['file'] for f in parsed['frames']]
+        assert any('main.go' in f for f in files)
+    
+    def test_parse_rust_panic(self) -> None:
+        """Test Rust panic message parsing."""
+        error_text = """
+thread 'main' panicked at 'called `Result::unwrap()` on an `Err` value', src/main.rs:42:9
+stack backtrace:
+   0: rust_begin_unwind
+             at /rustc/lib.rs:1:1
+   1: core::panicking::panic_fmt
+             at src/panicking.rs:50:5
+   2: myapp::process
+             at ./src/lib.rs:100:13
+"""
+        
+        parsed = ErrorContext.parse_rust_panic(error_text)
+        
+        assert parsed['language'] == 'rust'
+        assert parsed['error_type'] == 'panic'
+        assert 'Result::unwrap()' in parsed['error_message']
+        assert len(parsed['frames']) >= 1
+        
+        # First frame should be from the panic location
+        frame1 = parsed['frames'][0]
+        assert 'main.rs' in frame1['file']
+        assert frame1['line'] == 42
+        assert frame1['column'] == 9
+    
+    def test_parse_java_stack(self) -> None:
+        """Test Java stack trace parsing."""
+        error_text = """
+java.lang.NullPointerException: Cannot invoke method on null object
+	at com.example.MyClass.doSomething(MyClass.java:45)
+	at com.example.Main.run(Main.java:20)
+	at com.example.Main.main(Main.java:10)
+"""
+        
+        parsed = ErrorContext.parse_java_stack(error_text)
+        
+        assert parsed['language'] == 'java'
+        assert parsed['error_type'] == 'NullPointerException'
+        assert 'Cannot invoke' in parsed['error_message']
+        assert len(parsed['frames']) == 3
+        
+        frame1 = parsed['frames'][0]
+        assert 'MyClass.java' in frame1['file']
+        assert frame1['line'] == 45
+        assert 'doSomething' in frame1['function']
+    
+    def test_parse_traceback_auto_detects_language(self) -> None:
+        """Test that parse_traceback auto-detects language."""
+        js_error = "Error: test\n    at func (app.js:10:5)"
+        parsed = ErrorContext.parse_traceback(js_error)
+        assert parsed['language'] == 'javascript'
+        
+        go_error = "panic: test\n\tmain.go:15"
+        parsed = ErrorContext.parse_traceback(go_error)
+        assert parsed['language'] == 'go'
+    
+    def test_format_for_ai_includes_language(self) -> None:
+        """Test that formatted output includes language."""
+        error_text = "TypeError: test\n    at func (app.js:10:5)"
+        formatted = ErrorContext.format_for_ai(error_text)
+        
+        assert 'Language: Javascript' in formatted
+        assert 'Error Type: TypeError' in formatted
+        assert 'app.js:10:5' in formatted
 
 
 class TestContextGatherer:
