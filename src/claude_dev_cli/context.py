@@ -339,10 +339,25 @@ class DependencyAnalyzer:
 
 
 class ErrorContext:
-    """Parse and format error context."""
+    """Parse and format error context for multiple languages."""
     
     @staticmethod
-    def parse_traceback(error_text: str) -> Dict[str, Any]:
+    def detect_language(error_text: str) -> str:
+        """Detect programming language from error format."""
+        if 'Traceback (most recent call last):' in error_text or 'File "' in error_text:
+            return 'python'
+        elif 'at ' in error_text and ('.js:' in error_text or '.ts:' in error_text):
+            return 'javascript'
+        elif 'panic:' in error_text and '.go:' in error_text:
+            return 'go'
+        elif 'thread' in error_text and 'panicked at' in error_text and '.rs:' in error_text:
+            return 'rust'
+        elif 'at ' in error_text and '.java:' in error_text:
+            return 'java'
+        return 'unknown'
+    
+    @staticmethod
+    def parse_python_traceback(error_text: str) -> Dict[str, Any]:
         """Parse Python traceback into structured data."""
         lines = error_text.split('\n')
         
@@ -391,24 +406,183 @@ class ErrorContext:
                     'raw': error_text
                 }
         
-        return {'frames': frames, 'raw': error_text}
+        return {'frames': frames, 'raw': error_text, 'language': 'python'}
+    
+    @staticmethod
+    def parse_javascript_stack(error_text: str) -> Dict[str, Any]:
+        """Parse JavaScript/TypeScript stack trace."""
+        lines = error_text.split('\n')
+        frames = []
+        error_type = None
+        error_message = None
+        
+        for line in lines:
+            # Error message usually first: "Error: message" or "TypeError: message"
+            if not error_type and (':' in line and not line.strip().startswith('at')):
+                parts = line.split(':', 1)
+                error_type = parts[0].strip()
+                error_message = parts[1].strip() if len(parts) > 1 else ''
+            # Stack frame: "at functionName (file.js:line:col)" or "at file.js:line:col"
+            elif line.strip().startswith('at '):
+                match = re.search(r'at\s+(?:(.+?)\s+)?\(([^)]+)\)|(\S+)$', line)
+                if match:
+                    function = match.group(1) or 'anonymous'
+                    location = match.group(2) or match.group(3)
+                    if location and ':' in location:
+                        parts = location.rsplit(':', 2)
+                        frames.append({
+                            'file': parts[0],
+                            'line': int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None,
+                            'column': int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else None,
+                            'function': function
+                        })
+        
+        return {
+            'frames': frames,
+            'error_type': error_type,
+            'error_message': error_message,
+            'raw': error_text,
+            'language': 'javascript'
+        }
+    
+    @staticmethod
+    def parse_go_panic(error_text: str) -> Dict[str, Any]:
+        """Parse Go panic trace."""
+        lines = error_text.split('\n')
+        frames = []
+        error_message = None
+        
+        for line in lines:
+            # Panic message: "panic: message"
+            if line.startswith('panic:'):
+                error_message = line.replace('panic:', '').strip()
+            # Stack frame: "function(args)" followed by "\tfile.go:line +0xhex"
+            elif '\t' in line and '.go:' in line:
+                match = re.search(r'([^/\s]+\.go):(\d+)', line)
+                if match:
+                    frames.append({
+                        'file': match.group(1),
+                        'line': int(match.group(2)),
+                        'function': 'goroutine'
+                    })
+        
+        return {
+            'frames': frames,
+            'error_type': 'panic',
+            'error_message': error_message,
+            'raw': error_text,
+            'language': 'go'
+        }
+    
+    @staticmethod
+    def parse_rust_panic(error_text: str) -> Dict[str, Any]:
+        """Parse Rust panic message."""
+        lines = error_text.split('\n')
+        frames = []
+        error_message = None
+        
+        for line in lines:
+            # Panic message: "thread 'main' panicked at 'message', file.rs:line:col"
+            if 'panicked at' in line:
+                match = re.search(r"panicked at '([^']+)', ([^:]+):(\d+):(\d+)", line)
+                if match:
+                    error_message = match.group(1)
+                    frames.append({
+                        'file': match.group(2),
+                        'line': int(match.group(3)),
+                        'column': int(match.group(4)),
+                        'function': 'panic'
+                    })
+            # Stack backtrace frames
+            elif '.rs:' in line:
+                match = re.search(r'([^/\s]+\.rs):(\d+):(\d+)', line)
+                if match:
+                    frames.append({
+                        'file': match.group(1),
+                        'line': int(match.group(2)),
+                        'column': int(match.group(3)),
+                        'function': 'unknown'
+                    })
+        
+        return {
+            'frames': frames,
+            'error_type': 'panic',
+            'error_message': error_message,
+            'raw': error_text,
+            'language': 'rust'
+        }
+    
+    @staticmethod
+    def parse_java_stack(error_text: str) -> Dict[str, Any]:
+        """Parse Java stack trace."""
+        lines = error_text.split('\n')
+        frames = []
+        error_type = None
+        error_message = None
+        
+        for line in lines:
+            # Exception message: "java.lang.NullPointerException: message"
+            if not error_type and 'Exception' in line or 'Error' in line:
+                parts = line.split(':', 1)
+                error_type = parts[0].strip().split('.')[-1]  # Get last part of package
+                error_message = parts[1].strip() if len(parts) > 1 else ''
+            # Stack frame: "at package.Class.method(File.java:line)"
+            elif line.strip().startswith('at '):
+                match = re.search(r'at\s+([^(]+)\(([^:]+\.java):(\d+)\)', line)
+                if match:
+                    frames.append({
+                        'function': match.group(1),
+                        'file': match.group(2),
+                        'line': int(match.group(3))
+                    })
+        
+        return {
+            'frames': frames,
+            'error_type': error_type,
+            'error_message': error_message,
+            'raw': error_text,
+            'language': 'java'
+        }
+    
+    @staticmethod
+    def parse_traceback(error_text: str) -> Dict[str, Any]:
+        """Parse error/traceback with language auto-detection."""
+        language = ErrorContext.detect_language(error_text)
+        
+        if language == 'python':
+            return ErrorContext.parse_python_traceback(error_text)
+        elif language == 'javascript':
+            return ErrorContext.parse_javascript_stack(error_text)
+        elif language == 'go':
+            return ErrorContext.parse_go_panic(error_text)
+        elif language == 'rust':
+            return ErrorContext.parse_rust_panic(error_text)
+        elif language == 'java':
+            return ErrorContext.parse_java_stack(error_text)
+        else:
+            return {'raw': error_text, 'language': 'unknown'}
     
     @staticmethod
     def format_for_ai(error_text: str) -> str:
-        """Format error for AI consumption."""
+        """Format error for AI consumption with language detection."""
         parsed = ErrorContext.parse_traceback(error_text)
         
         if 'error_type' not in parsed:
             return error_text
         
+        language = parsed.get('language', 'unknown')
         parts = [
+            f"Language: {language.title()}",
             f"Error Type: {parsed['error_type']}",
             f"Error Message: {parsed.get('error_message', 'N/A')}",
             "\nStack Trace:"
         ]
         
         for i, frame in enumerate(parsed.get('frames', []), 1):
-            parts.append(f"  {i}. {frame.get('file', 'unknown')}:{frame.get('line', '?')} in {frame.get('function', 'unknown')}")
+            file_loc = f"{frame.get('file', 'unknown')}:{frame.get('line', '?')}"
+            if 'column' in frame:
+                file_loc += f":{frame.get('column', '?')}"
+            parts.append(f"  {i}. {file_loc} in {frame.get('function', 'unknown')}")
             if 'code' in frame:
                 parts.append(f"     > {frame['code']}")
         
