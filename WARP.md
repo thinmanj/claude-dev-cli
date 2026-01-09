@@ -319,6 +319,41 @@ When modifying configuration:
    - Check tags: https://github.com/thinmanj/claude-dev-cli/tags
    - Check releases: https://github.com/thinmanj/claude-dev-cli/releases
 
+### Publish to Homebrew (Optional)
+
+1. **Update Homebrew formula**
+   ```bash
+   # Get new SHA256 from PyPI
+   curl -sL https://pypi.org/pypi/claude-dev-cli/json | \
+     python3 -c "import sys, json; data = json.load(sys.stdin); \
+     [print(f'URL: {f[\"url\"]}\nSHA256: {f[\"digests\"][\"sha256\"]}') \
+     for f in data['urls'] if f['packagetype'] == 'sdist']"
+   ```
+
+2. **Update formula file**
+   ```bash
+   # Edit /opt/homebrew/Library/Taps/thinmanj/homebrew-tap/Formula/claude-dev-cli.rb
+   # Update url and sha256 fields
+   ```
+
+3. **Test and push**
+   ```bash
+   # Test installation
+   brew uninstall claude-dev-cli 2>/dev/null || true
+   brew install --build-from-source thinmanj/tap/claude-dev-cli
+   cdc --version
+   
+   # Push to GitHub
+   cd /opt/homebrew/Library/Taps/thinmanj/homebrew-tap
+   git add Formula/claude-dev-cli.rb
+   git commit -m "feat: update claude-dev-cli to v0.X.0
+   
+   Co-Authored-By: Warp <agent@warp.dev>"
+   git push
+   ```
+
+   See HOMEBREW.md for detailed instructions and automation script.
+
 ### Post-Release
 
 1. **Test installation from PyPI**
@@ -327,11 +362,17 @@ When modifying configuration:
    cdc --version  # Should show new version
    ```
 
-2. **Update documentation**
+2. **Test installation from Homebrew**
+   ```bash
+   brew upgrade claude-dev-cli
+   cdc --version  # Should show new version
+   ```
+
+3. **Update documentation**
    - Verify README.md is current on GitHub
    - Check that PyPI description renders correctly
 
-3. **Announce release** (optional)
+4. **Announce release** (optional)
    - Create GitHub Release with changelog
    - Update project documentation
    - Notify users if breaking changes

@@ -1,5 +1,12 @@
 # Claude Dev CLI
 
+[![PyPI version](https://badge.fury.io/py/claude-dev-cli.svg)](https://badge.fury.io/py/claude-dev-cli)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-218%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Homebrew](https://img.shields.io/badge/homebrew-available-orange.svg)](https://github.com/thinmanj/homebrew-tap)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 A powerful command-line tool for developers using Claude AI with multi-API routing, test generation, code review, and comprehensive usage tracking.
 
 ## Features
@@ -55,17 +62,37 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 
 ## Installation
 
-### Basic Installation
+### Via Homebrew (macOS/Linux)
 
 ```bash
-pip install claude-dev-cli
+# Add the tap
+brew tap thinmanj/tap
+
+# Install
+brew install claude-dev-cli
+
+# Or in one command
+brew install thinmanj/tap/claude-dev-cli
 ```
 
-### With TOON Support (Recommended for Cost Savings)
+### Via pip
 
 ```bash
-# Install with TOON format support for 30-60% token reduction
+# Basic installation
+pip install claude-dev-cli
+
+# With TOON support (30-60% token reduction)
 pip install claude-dev-cli[toon]
+```
+
+### Via pipx (Recommended for CLI tools)
+
+```bash
+# Isolated installation
+pipx install claude-dev-cli
+
+# With TOON support
+pipx install claude-dev-cli[toon]
 ```
 
 ## Quick Start

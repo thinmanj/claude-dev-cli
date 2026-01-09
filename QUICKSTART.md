@@ -4,12 +4,27 @@ Get up and running with claude-dev-cli in minutes! This guide takes you from ins
 
 ## 📦 Installation (30 seconds)
 
+### Homebrew (macOS/Linux)
+
+```bash
+# One command install
+brew install thinmanj/tap/claude-dev-cli
+```
+
+### pip
+
 ```bash
 # Basic installation
 pip install claude-dev-cli
 
-# Or with all features (recommended)
+# With all features (recommended)
 pip install claude-dev-cli[toon]
+```
+
+### pipx (Isolated install)
+
+```bash
+pipx install claude-dev-cli[toon]
 ```
 
 ## 🔑 Setup (1 minute)
