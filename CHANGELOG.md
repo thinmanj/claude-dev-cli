@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2025-01-09
+
+### Added
+- **Conversation Summarization**: Reduce token usage and costs in long conversations
+  - `cdc history summarize <conversation_id>`: Manually summarize any conversation
+  - `cdc history summarize --latest`: Summarize the most recent conversation
+  - Automatic summarization in interactive mode when conversations exceed token threshold
+  - Smart compression: keeps recent messages, summarizes older ones
+  - Token and message count tracking with savings display
+  - Configurable via `summarization` section in config.json
+- **Summarization Configuration**: Fine-tune summarization behavior
+  - `auto_summarize`: Enable/disable automatic summarization (default: true)
+  - `threshold_tokens`: Token count threshold for auto-summarization (default: 8000)
+  - `keep_recent_messages`: Number of recent message pairs to keep (default: 4)
+  - `summary_max_words`: Maximum words in generated summary (default: 300)
+- **History Management**: New delete command
+  - `cdc history delete <conversation_id>`: Remove conversations you no longer need
+
+### Enhanced
+- `Conversation` class now tracks summaries and estimates token counts
+- Interactive mode shows token savings when auto-summarization occurs
+- Conversation summaries include context from previous summaries (rolling summaries)
+- History export and listing show token estimates
+
+### Changed
+- Conversations can now have both a summary and recent messages
+- `should_summarize()` method checks both token threshold and minimum message count
+- Auto-save in interactive mode triggers after summarization
+
 ## [0.8.2] - 2025-01-09
 
 ### Added

@@ -39,11 +39,13 @@ class Conversation:
         self,
         conversation_id: Optional[str] = None,
         created_at: Optional[datetime] = None,
-        updated_at: Optional[datetime] = None
+        updated_at: Optional[datetime] = None,
+        summary: Optional[str] = None
     ):
         self.conversation_id = conversation_id or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         self.created_at = created_at or datetime.utcnow()
         self.updated_at = updated_at or datetime.utcnow()
+        self.summary = summary  # AI-generated summary of older messages
         self.messages: List[Message] = []
     
     def add_message(self, role: str, content: str) -> None:
@@ -62,14 +64,37 @@ class Conversation:
                 return summary
         return "(empty conversation)"
     
+    def estimate_tokens(self) -> int:
+        """Estimate token count for the conversation."""
+        # Rough estimation: ~4 characters per token
+        total_chars = len(self.summary or "")
+        for msg in self.messages:
+            total_chars += len(msg.content)
+        return total_chars // 4
+    
+    def should_summarize(self, threshold_tokens: int = 8000) -> bool:
+        """Check if conversation should be summarized."""
+        return self.estimate_tokens() > threshold_tokens and len(self.messages) > 4
+    
+    def compress_messages(self, keep_recent: int = 4) -> tuple[List[Message], List[Message]]:
+        """Split messages into old (to summarize) and recent (to keep)."""
+        if len(self.messages) <= keep_recent:
+            return [], self.messages
+        
+        split_point = len(self.messages) - keep_recent
+        return self.messages[:split_point], self.messages[split_point:]
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
-        return {
+        data = {
             "conversation_id": self.conversation_id,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "messages": [msg.to_dict() for msg in self.messages]
         }
+        if self.summary:
+            data["summary"] = self.summary
+        return data
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Conversation":
@@ -77,7 +102,8 @@ class Conversation:
         conv = cls(
             conversation_id=data["conversation_id"],
             created_at=datetime.fromisoformat(data["created_at"]),
-            updated_at=datetime.fromisoformat(data["updated_at"])
+            updated_at=datetime.fromisoformat(data["updated_at"]),
+            summary=data.get("summary")
         )
         conv.messages = [Message.from_dict(msg) for msg in data.get("messages", [])]
         return conv
@@ -187,3 +213,63 @@ class ConversationHistory:
             return json.dumps(conv.to_dict(), indent=2)
         
         return None
+    
+    def summarize_conversation(
+        self,
+        conversation_id: str,
+        keep_recent: int = 4
+    ) -> Optional[str]:
+        """Summarize older messages in a conversation, keeping recent ones.
+        
+        Args:
+            conversation_id: The conversation to summarize
+            keep_recent: Number of recent message pairs to keep unsummarized
+            
+        Returns:
+            The generated summary or None if conversation not found
+        """
+        from claude_dev_cli.core import ClaudeClient
+        
+        conv = self.load_conversation(conversation_id)
+        if not conv:
+            return None
+        
+        # Split messages
+        old_messages, recent_messages = conv.compress_messages(keep_recent)
+        
+        if not old_messages:
+            return "No messages to summarize (too few messages)"
+        
+        # Build summary prompt
+        conversation_text = []
+        if conv.summary:
+            conversation_text.append(f"Previous summary:\n{conv.summary}\n\n")
+        
+        conversation_text.append("Conversation to summarize:\n")
+        for msg in old_messages:
+            role_name = "User" if msg.role == "user" else "Assistant"
+            conversation_text.append(f"{role_name}: {msg.content}\n")
+        
+        prompt = (
+            "Please provide a concise summary of this conversation that captures:"
+            "\n1. Main topics discussed"
+            "\n2. Key questions asked and answers provided"
+            "\n3. Important decisions or conclusions"
+            "\n4. Any action items or follow-ups mentioned"
+            "\n\nKeep the summary under 300 words but retain all important context."
+            "\n\n" + "".join(conversation_text)
+        )
+        
+        # Get summary from Claude
+        client = ClaudeClient()
+        new_summary = client.call(prompt)
+        
+        # Update conversation
+        conv.summary = new_summary
+        conv.messages = recent_messages
+        conv.updated_at = datetime.utcnow()
+        
+        # Save updated conversation
+        self.save_conversation(conv)
+        
+        return new_summary

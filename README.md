@@ -249,7 +249,33 @@ cdc template list --user
 - **explain-code**: Detailed code explanation
 - **api-design**: API design assistance
 
-### 6. Usage Tracking
+### 6. Conversation History & Summarization (NEW in v0.8.3)
+
+```bash
+# List recent conversations
+cdc history list
+
+# Search conversations
+cdc history list --search "python decorators"
+
+# Export conversation
+cdc history export 20240109_143022 -o chat.md
+
+# Summarize to reduce token usage
+cdc history summarize --latest
+cdc history summarize 20240109_143022 --keep-recent 6
+
+# Delete old conversations
+cdc history delete 20240109_143022
+```
+
+**Auto-Summarization** in interactive mode:
+- Automatically triggers when conversation exceeds 8,000 tokens
+- Keeps recent messages (default: 4 pairs), summarizes older ones
+- Reduces API costs by ~30-50% in long conversations
+- Shows token savings after summarization
+
+### 7. Usage Tracking
 
 ```bash
 # View all usage

@@ -145,6 +145,7 @@ def interactive(
     config = Config()
     history_dir = config.config_dir / "history"
     conv_history = ConversationHistory(history_dir)
+    summ_config = config.get_summarization_config()
     
     # Load or create conversation
     if continue_conversation:
@@ -202,6 +203,42 @@ def interactive(
                 # Add assistant response to history
                 full_response = ''.join(response_buffer)
                 conversation.add_message("assistant", full_response)
+                
+                # Check if auto-summarization is needed
+                if summ_config.auto_summarize and conversation.should_summarize(threshold_tokens=summ_config.threshold_tokens):
+                    console.print("\n[yellow]⚠ Conversation getting long, summarizing older messages...[/yellow]")
+                    old_messages, recent_messages = conversation.compress_messages(keep_recent=summ_config.keep_recent_messages)
+                    
+                    if old_messages:
+                        # Build summary prompt
+                        conversation_text = []
+                        if conversation.summary:
+                            conversation_text.append(f"Previous summary:\n{conversation.summary}\n\n")
+                        
+                        conversation_text.append("Conversation to summarize:\n")
+                        for msg in old_messages:
+                            role_name = "User" if msg.role == "user" else "Assistant"
+                            conversation_text.append(f"{role_name}: {msg.content}\n")
+                        
+                        summary_prompt = (
+                            "Please provide a concise summary of this conversation that captures:"
+                            "\n1. Main topics discussed"
+                            "\n2. Key questions asked and answers provided"
+                            "\n3. Important decisions or conclusions"
+                            "\n4. Any action items or follow-ups mentioned"
+                            "\n\nKeep the summary under 300 words but retain all important context."
+                            "\n\n" + "".join(conversation_text)
+                        )
+                        
+                        # Get summary (use same client)
+                        new_summary = client.call(summary_prompt)
+                        
+                        # Update conversation
+                        conversation.summary = new_summary
+                        conversation.messages = recent_messages
+                        
+                        tokens_saved = len("".join(conversation_text)) // 4
+                        console.print(f"[dim]✓ Summarized older messages (~{tokens_saved:,} tokens saved)[/dim]")
                 
                 # Auto-save periodically
                 if save and len(conversation.messages) % 10 == 0:
@@ -339,6 +376,100 @@ def history_export(ctx: click.Context, conversation_id: str, format: str, output
         console.print(f"[green]✓[/green] Exported to {output}")
     else:
         click.echo(content)
+
+
+@history.command('summarize')
+@click.argument('conversation_id', required=False)
+@click.option('--keep-recent', type=int, default=4, help='Number of recent message pairs to keep')
+@click.option('--latest', is_flag=True, help='Summarize the latest conversation')
+@click.pass_context
+def history_summarize(
+    ctx: click.Context, 
+    conversation_id: Optional[str], 
+    keep_recent: int,
+    latest: bool
+) -> None:
+    """Summarize a conversation to reduce token usage.
+    
+    Older messages are compressed into an AI-generated summary while keeping
+    recent messages intact. This reduces context window usage and costs.
+    
+    Examples:
+        cdc history summarize 20240109_143022
+        cdc history summarize --latest
+        cdc history summarize --latest --keep-recent 6
+    """
+    console = ctx.obj['console']
+    config = Config()
+    conv_history = ConversationHistory(config.config_dir / "history")
+    
+    # Determine which conversation to summarize
+    if latest:
+        conv = conv_history.get_latest_conversation()
+        if not conv:
+            console.print("[red]No conversations found[/red]")
+            sys.exit(1)
+        conversation_id = conv.conversation_id
+    elif not conversation_id:
+        console.print("[red]Error: Provide conversation_id or use --latest[/red]")
+        console.print("\nUsage: cdc history summarize CONVERSATION_ID")
+        console.print("   or: cdc history summarize --latest")
+        sys.exit(1)
+    
+    # Load conversation to show stats
+    conv = conv_history.load_conversation(conversation_id)
+    if not conv:
+        console.print(f"[red]Conversation {conversation_id} not found[/red]")
+        sys.exit(1)
+    
+    # Show before stats
+    tokens_before = conv.estimate_tokens()
+    messages_before = len(conv.messages)
+    console.print(f"\n[cyan]Conversation:[/cyan] {conversation_id}")
+    console.print(f"[dim]Messages: {messages_before} | Estimated tokens: {tokens_before:,}[/dim]\n")
+    
+    if messages_before <= keep_recent:
+        console.print(f"[yellow]Too few messages to summarize ({messages_before} <= {keep_recent})[/yellow]")
+        return
+    
+    # Summarize
+    with console.status("[bold blue]Generating summary..."):
+        summary = conv_history.summarize_conversation(conversation_id, keep_recent)
+    
+    if not summary:
+        console.print("[red]Failed to generate summary[/red]")
+        sys.exit(1)
+    
+    # Reload and show after stats
+    conv = conv_history.load_conversation(conversation_id)
+    if conv:
+        tokens_after = conv.estimate_tokens()
+        messages_after = len(conv.messages)
+        
+        token_savings = tokens_before - tokens_after
+        savings_percent = (token_savings / tokens_before * 100) if tokens_before > 0 else 0
+        
+        console.print("[green]✓ Conversation summarized[/green]\n")
+        console.print(f"[dim]Messages:[/dim] {messages_before} → {messages_after}")
+        console.print(f"[dim]Tokens:[/dim] {tokens_before:,} → {tokens_after:,} ({token_savings:,} saved, {savings_percent:.1f}%)\n")
+        console.print("[bold]Summary:[/bold]")
+        console.print(Panel(summary, border_style="blue"))
+
+
+@history.command('delete')
+@click.argument('conversation_id')
+@click.pass_context
+def history_delete(ctx: click.Context, conversation_id: str) -> None:
+    """Delete a conversation."""
+    console = ctx.obj['console']
+    config = Config()
+    conv_history = ConversationHistory(config.config_dir / "history")
+    
+    if conv_history.delete_conversation(conversation_id):
+        console.print(f"[green]✓[/green] Deleted conversation: {conversation_id}")
+    else:
+        console.print(f"[red]Conversation {conversation_id} not found[/red]")
+        sys.exit(1)
 
 
 @main.group()

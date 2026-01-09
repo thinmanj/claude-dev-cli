@@ -21,6 +21,15 @@ class ContextConfig(BaseModel):
     include_tests: bool = True  # Include test files by default
 
 
+class SummarizationConfig(BaseModel):
+    """Conversation summarization configuration."""
+    
+    auto_summarize: bool = True  # Enable automatic summarization
+    threshold_tokens: int = 8000  # Token threshold for auto-summarization
+    keep_recent_messages: int = 4  # Number of recent message pairs to keep
+    summary_max_words: int = 300  # Maximum words in generated summary
+
+
 class APIConfig(BaseModel):
     """Configuration for a Claude API key."""
     
@@ -87,6 +96,7 @@ class Config:
                 "default_model": "claude-3-5-sonnet-20241022",
                 "max_tokens": 4096,
                 "context": ContextConfig().model_dump(),
+                "summarization": SummarizationConfig().model_dump(),
             }
             self._save_config(default_config)
             return default_config
@@ -263,3 +273,8 @@ class Config:
         """Get context gathering configuration."""
         context_data = self._data.get("context", {})
         return ContextConfig(**context_data) if context_data else ContextConfig()
+    
+    def get_summarization_config(self) -> SummarizationConfig:
+        """Get conversation summarization configuration."""
+        summ_data = self._data.get("summarization", {})
+        return SummarizationConfig(**summ_data) if summ_data else SummarizationConfig()
