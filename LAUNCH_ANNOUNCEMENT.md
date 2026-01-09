@@ -7,26 +7,19 @@ Use these templates to announce claude-dev-cli on various platforms.
 ## Twitter/X
 
 ```
-🎉 Introducing claude-dev-cli v0.8.3!
+🎉 claude-dev-cli v0.8.3 - AI dev assistant with Claude API
 
-AI-powered CLI for developers with Claude API:
-
-✨ Multi-API routing (personal/client/enterprise keys)
-✨ Code review, test generation, debugging
-✨ Context intelligence with auto-gathering
+✨ Multi-API routing for teams/clients
+✨ Auto code review & test generation
+✨ Context intelligence
 ✨ Conversation summarization (30-50% cost savings)
-✨ Multi-language error parsing (Python/JS/Go/Rust/Java)
-✨ Usage tracking & cost control
+✨ 257 tests passing
 
-Install:
 🍺 brew install thinmanj/tap/claude-dev-cli
-🐍 pip install claude-dev-cli
-
-257 tests passing | MIT License
 
 https://github.com/thinmanj/claude-dev-cli
 
-#AI #DevTools #CLI #Claude #Anthropic #Python #DeveloperTools
+#AI #DevTools #CLI #Claude
 ```
 
 ---
