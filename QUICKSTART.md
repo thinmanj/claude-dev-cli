@@ -133,16 +133,24 @@ cdc review src/api.py --auto-context
 # ✓ Test files (if they exist)
 ```
 
-### Intelligent Debugging
+### Intelligent Debugging (Multi-Language Support v0.8.2)
 
 ```bash
-# Debug with context
-python broken.py 2>&1 | cdc debug -f broken.py --auto-context
+# Debug with context - supports 5 languages!
+python broken.py 2>&1 | cdc debug -f broken.py --auto-context  # Python
+node app.js 2>&1 | cdc debug --auto-context  # JavaScript/TypeScript  
+go run main.go 2>&1 | cdc debug --auto-context  # Go
+cargo run 2>&1 | cdc debug --auto-context  # Rust
+java Main 2>&1 | cdc debug --auto-context  # Java
 
 # Automatically includes:
-# ✓ Parsed error traceback (file, line, function)
+# ✓ Parsed error traceback (file, line, function, language)
 # ✓ Git context (recent changes)
 # ✓ Related code files
+
+# Preview context before debugging (v0.8.2)
+cdc context summary broken.py
+# Shows: files, sizes, estimated tokens, truncation warnings
 ```
 
 ### Context-Aware Questions

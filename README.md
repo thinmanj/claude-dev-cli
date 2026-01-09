@@ -41,7 +41,8 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
   - `git commit`, `generate tests`, `generate docs` (v0.8.1)
 - **Git Integration**: Automatically include branch, commits, modified files
 - **Dependency Analysis**: Parse imports and include related files
-- **Error Parsing**: Structured Python traceback parsing
+- **Multi-Language Error Parsing** (v0.8.2): Python, JavaScript/TypeScript, Go, Rust, Java
+- **Context Summary** (v0.8.2): Preview context before API calls with `cdc context summary`
 - **Smart Truncation**: Prevent token limits with configurable file size limits
 - **Project Memory**: Remember preferences per project
 - **Global Config**: Set context defaults in `~/.claude-dev-cli/config.json`
@@ -155,7 +156,7 @@ git add .
 cdc git commit --auto-context
 ```
 
-### 4. Context-Aware Operations (NEW in v0.8.0)
+### 4. Context-Aware Operations (v0.8.0+)
 
 ```bash
 # Auto-context includes: git info, dependencies, related files
@@ -164,9 +165,16 @@ cdc git commit --auto-context
 cdc review mymodule.py --auto-context
 # ✓ Context gathered (git, dependencies, tests)
 
-# Debug with parsed error details
+# Debug with parsed error details (multi-language support)
 python broken.py 2>&1 | cdc debug -f broken.py --auto-context
+node app.js 2>&1 | cdc debug --auto-context  # JavaScript/TypeScript
+go run main.go 2>&1 | cdc debug --auto-context  # Go
 # ✓ Context gathered (error details, git context)
+# Supports: Python, JavaScript, TypeScript, Go, Rust, Java
+
+# Preview context before making API calls - NEW in v0.8.2
+cdc context summary mymodule.py
+# Shows: files, sizes, lines, estimated tokens, truncation warnings
 
 # Ask questions with file context
 cdc ask -f mycode.py --auto-context "how can I improve this?"

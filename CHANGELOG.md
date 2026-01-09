@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2025-01-09
+
+### Added
+- **Multi-Language Error Parsing**: Debug command now supports 5 programming languages
+  - JavaScript/TypeScript: Parse stack traces with `at func (file.js:line:col)` format
+  - Go: Parse panic traces with goroutine information
+  - Rust: Parse panic messages with precise file locations
+  - Java: Parse exception stack traces with full class paths
+  - Automatic language detection from error format
+- **Context Summary Command**: Preview context before API calls
+  - `cdc context summary <file>`: Show what context would be gathered
+  - Rich table display with Type, Content, Size, Lines, Truncated columns
+  - Estimated token count calculation (~chars / 4)
+  - Total statistics across all context items
+  - Truncation warnings when size limits are hit
+  - Toggle options: `--include-git`, `--include-deps`, `--include-tests`
+- **Enhanced Error Context**:
+  - `detect_language()`: Auto-identify error language
+  - Language-specific parsers for each supported language
+  - Column numbers for JS, TypeScript, Rust errors
+  - Improved error formatting with language identification
+
+### Enhanced
+- `format_for_ai()` now includes language identification in output
+- Error parsing preserves original error text as fallback
+- Frame structure adapted per language (column for JS/Rust, class for Java)
+- Backward compatible with existing Python error parsing
+
+### Testing
+- Added 11 new tests for multi-language error parsing
+- Language detection tests for all 5 languages  
+- Parser validation with realistic error examples
+- Auto-detection and formatting tests
+- Total: 218 tests (was 207)
+
 ## [0.8.1] - 2024-12-29
 
 ### Added
