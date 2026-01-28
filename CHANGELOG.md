@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0-alpha] - 2026-01-28
+
+### Added (Alpha - Not yet fully integrated)
+- **Model Profile System**: Create named model profiles with custom pricing
+  - `ModelProfile` class with pricing per Mtok (input/output)
+  - Support for global and API-specific profiles
+  - Project-level model profile preferences
+- **CLI Commands**: `cdc model` command group
+  - `cdc model add <name> <model_id>`: Create model profile with pricing
+  - `cdc model list`: View all profiles with pricing table
+  - `cdc model show <name>`: Detailed profile information
+  - `cdc model remove <name>`: Delete profile
+  - `cdc model set-default <name>`: Set default (global or per-API)
+- **Default Profiles**: 3 built-in profiles
+  - `fast`: Haiku ($0.80/$4.00 per Mtok)
+  - `smart`: Sonnet 4 ($3.00/$15.00 per Mtok) - default
+  - `powerful`: Opus 4 ($15.00/$75.00 per Mtok)
+- **Multi-API Architecture**: Each API config can have its own default model profile
+- **Config Schema**: Added `model_profiles`, `default_model_profile` to config.json
+
+### Changed
+- `APIConfig` now has `default_model_profile` field
+- `ProjectProfile` now has `model_profile` field
+
+### Note
+This is an ALPHA release. Model profiles are defined but not yet integrated with:
+- Usage tracking (still uses hardcoded pricing)
+- Model resolution (still uses raw model IDs)
+- These integrations coming in v0.10.0 final
+
 ## [0.9.0] - 2026-01-28
 
 ### Added

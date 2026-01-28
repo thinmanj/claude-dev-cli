@@ -37,6 +37,19 @@ class APIConfig(BaseModel):
     api_key: str
     description: Optional[str] = None
     default: bool = False
+    default_model_profile: Optional[str] = None  # Default model profile for this API
+
+
+class ModelProfile(BaseModel):
+    """Model profile with pricing information."""
+    
+    name: str  # User-friendly alias (e.g., "fast", "smart", "powerful")
+    model_id: str  # Actual Claude model ID
+    description: Optional[str] = None
+    input_price_per_mtok: float  # Input cost per million tokens (USD)
+    output_price_per_mtok: float  # Output cost per million tokens (USD)
+    use_cases: List[str] = Field(default_factory=list)  # Task types
+    api_config_name: Optional[str] = None  # Tied to specific API config, or None for global
 
 
 class ProjectProfile(BaseModel):
@@ -46,6 +59,7 @@ class ProjectProfile(BaseModel):
     api_config: str  # Name of the API config to use
     system_prompt: Optional[str] = None
     allowed_commands: List[str] = Field(default_factory=lambda: ["all"])
+    model_profile: Optional[str] = None  # Preferred model profile for this project
     
     # Project memory - preferences and patterns
     auto_context: bool = False  # Default value for --auto-context flag
@@ -108,7 +122,9 @@ class Config:
             default_config = {
                 "api_configs": [],
                 "project_profiles": [],
-                "default_model": "claude-sonnet-4-5-20250929",
+                "model_profiles": self._get_default_model_profiles(),
+                "default_model": "claude-sonnet-4-5-20250929",  # Legacy, kept for backwards compat
+                "default_model_profile": "smart",
                 "max_tokens": 4096,
                 "context": ContextConfig().model_dump(),
                 "summarization": SummarizationConfig().model_dump(),
@@ -132,6 +148,10 @@ class Config:
                     config["context"] = ContextConfig().model_dump()
                 if "summarization" not in config:
                     config["summarization"] = SummarizationConfig().model_dump()
+                if "model_profiles" not in config:
+                    config["model_profiles"] = self._get_default_model_profiles()
+                if "default_model_profile" not in config:
+                    config["default_model_profile"] = "smart"
                 
                 return config
         except (json.JSONDecodeError, IOError) as e:
@@ -146,6 +166,38 @@ class Config:
         
         with open(self.config_file, 'w') as f:
             json.dump(data, f, indent=2)
+    
+    def _get_default_model_profiles(self) -> List[Dict]:
+        """Get default model profiles with current Anthropic pricing."""
+        return [
+            {
+                "name": "fast",
+                "model_id": "claude-3-5-haiku-20241022",
+                "description": "Fast and economical for simple tasks",
+                "input_price_per_mtok": 0.80,
+                "output_price_per_mtok": 4.00,
+                "use_cases": ["quick", "simple", "classification"],
+                "api_config_name": None
+            },
+            {
+                "name": "smart",
+                "model_id": "claude-sonnet-4-5-20250929",
+                "description": "Balanced performance and cost for most tasks",
+                "input_price_per_mtok": 3.00,
+                "output_price_per_mtok": 15.00,
+                "use_cases": ["general", "coding", "analysis"],
+                "api_config_name": None
+            },
+            {
+                "name": "powerful",
+                "model_id": "claude-opus-4-20250514",
+                "description": "Maximum capability for complex tasks",
+                "input_price_per_mtok": 15.00,
+                "output_price_per_mtok": 75.00,
+                "use_cases": ["complex", "research", "creative"],
+                "api_config_name": None
+            }
+        ]
     
     def _auto_migrate_keys(self) -> None:
         """Automatically migrate plaintext API keys to secure storage."""
@@ -322,3 +374,154 @@ class Config:
         """Get conversation summarization configuration."""
         summ_data = self._data.get("summarization", {})
         return SummarizationConfig(**summ_data) if summ_data else SummarizationConfig()
+    
+    # Model Profile Management
+    
+    def add_model_profile(
+        self,
+        name: str,
+        model_id: str,
+        input_price: float,
+        output_price: float,
+        description: Optional[str] = None,
+        use_cases: Optional[List[str]] = None,
+        api_config_name: Optional[str] = None,
+        make_default: bool = False
+    ) -> None:
+        """Add a model profile."""
+        profiles = self._data.get("model_profiles", [])
+        
+        # Check if name already exists
+        for profile in profiles:
+            if profile["name"] == name:
+                raise ValueError(f"Model profile '{name}' already exists")
+        
+        profile = ModelProfile(
+            name=name,
+            model_id=model_id,
+            description=description,
+            input_price_per_mtok=input_price,
+            output_price_per_mtok=output_price,
+            use_cases=use_cases or [],
+            api_config_name=api_config_name
+        )
+        
+        profiles.append(profile.model_dump())
+        self._data["model_profiles"] = profiles
+        
+        if make_default:
+            if api_config_name:
+                # Set as default for specific API config
+                self.set_api_default_model_profile(api_config_name, name)
+            else:
+                # Set as global default
+                self._data["default_model_profile"] = name
+        
+        self._save_config()
+    
+    def get_model_profile(
+        self,
+        name: str,
+        api_config_name: Optional[str] = None
+    ) -> Optional[ModelProfile]:
+        """Get model profile by name.
+        
+        If api_config_name is provided, prefer API-specific profiles.
+        """
+        profiles = self._data.get("model_profiles", [])
+        
+        # First, try to find API-specific profile
+        if api_config_name:
+            for p in profiles:
+                if p["name"] == name and p.get("api_config_name") == api_config_name:
+                    return ModelProfile(**p)
+        
+        # Fall back to global profile (api_config_name = None)
+        for p in profiles:
+            if p["name"] == name and p.get("api_config_name") is None:
+                return ModelProfile(**p)
+        
+        # Fall back to any profile with that name
+        for p in profiles:
+            if p["name"] == name:
+                return ModelProfile(**p)
+        
+        return None
+    
+    def list_model_profiles(
+        self,
+        api_config_name: Optional[str] = None
+    ) -> List[ModelProfile]:
+        """List model profiles.
+        
+        If api_config_name is provided, include both global and API-specific profiles.
+        """
+        profiles = self._data.get("model_profiles", [])
+        result = []
+        
+        for p in profiles:
+            profile_api = p.get("api_config_name")
+            # Include if: global profile OR matches requested API
+            if profile_api is None or (api_config_name and profile_api == api_config_name):
+                result.append(ModelProfile(**p))
+        
+        return result
+    
+    def remove_model_profile(self, name: str) -> bool:
+        """Remove a model profile."""
+        profiles = self._data.get("model_profiles", [])
+        original_count = len(profiles)
+        
+        self._data["model_profiles"] = [
+            p for p in profiles if p["name"] != name
+        ]
+        
+        if len(self._data["model_profiles"]) < original_count:
+            self._save_config()
+            return True
+        return False
+    
+    def set_default_model_profile(self, name: str) -> None:
+        """Set global default model profile."""
+        # Verify profile exists
+        if not self.get_model_profile(name):
+            raise ValueError(f"Model profile '{name}' not found")
+        
+        self._data["default_model_profile"] = name
+        self._save_config()
+    
+    def get_default_model_profile(self, api_config_name: Optional[str] = None) -> str:
+        """Get default model profile name.
+        
+        Resolution order:
+        1. API-specific default
+        2. Global default
+        3. Fallback to 'smart'
+        """
+        # Check API-specific default
+        if api_config_name:
+            api_configs = self._data.get("api_configs", [])
+            for config in api_configs:
+                if config["name"] == api_config_name:
+                    api_default = config.get("default_model_profile")
+                    if api_default:
+                        return api_default
+        
+        # Global default
+        return self._data.get("default_model_profile", "smart")
+    
+    def set_api_default_model_profile(self, api_config_name: str, profile_name: str) -> None:
+        """Set default model profile for a specific API config."""
+        api_configs = self._data.get("api_configs", [])
+        
+        found = False
+        for config in api_configs:
+            if config["name"] == api_config_name:
+                config["default_model_profile"] = profile_name
+                found = True
+                break
+        
+        if not found:
+            raise ValueError(f"API config '{api_config_name}' not found")
+        
+        self._save_config()

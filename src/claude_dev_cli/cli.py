@@ -607,6 +607,199 @@ def config_set_model(ctx: click.Context, model: str) -> None:
 
 
 @main.group()
+def model() -> None:
+    """Manage model profiles and pricing."""
+    pass
+
+
+@model.command('add')
+@click.argument('name')
+@click.argument('model_id')
+@click.option('--input-price', type=float, required=True, help='Input price per Mtok (USD)')
+@click.option('--output-price', type=float, required=True, help='Output price per Mtok (USD)')
+@click.option('--description', help='Model profile description')
+@click.option('--api-config', help='Tie to specific API config')
+@click.option('--default', is_flag=True, help='Set as default')
+@click.pass_context
+def model_add(
+    ctx: click.Context,
+    name: str,
+    model_id: str,
+    input_price: float,
+    output_price: float,
+    description: Optional[str],
+    api_config: Optional[str],
+    default: bool
+) -> None:
+    """Add a model profile.
+    
+    Examples:
+      cdc model add fast claude-3-5-haiku-20241022 --input-price 0.80 --output-price 4.00
+      cdc model add enterprise-smart claude-sonnet-4-5-20250929 --input-price 2.50 --output-price 12.50 --api-config enterprise
+    """
+    console = ctx.obj['console']
+    
+    try:
+        config = Config()
+        config.add_model_profile(
+            name=name,
+            model_id=model_id,
+            input_price=input_price,
+            output_price=output_price,
+            description=description,
+            api_config_name=api_config,
+            make_default=default
+        )
+        
+        scope = f" for API '{api_config}'" if api_config else " (global)"
+        console.print(f"[green]✓[/green] Model profile '{name}' added{scope}")
+        console.print(f"[dim]Model: {model_id}[/dim]")
+        console.print(f"[dim]Pricing: ${input_price}/Mtok input, ${output_price}/Mtok output[/dim]")
+        
+        if default:
+            console.print(f"[green]Set as default{scope}[/green]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@model.command('list')
+@click.option('--api-config', help='Filter by API config')
+@click.pass_context
+def model_list(ctx: click.Context, api_config: Optional[str]) -> None:
+    """List model profiles."""
+    console = ctx.obj['console']
+    
+    try:
+        from rich.table import Table
+        
+        config = Config()
+        profiles = config.list_model_profiles(api_config_name=api_config)
+        
+        if not profiles:
+            console.print("[yellow]No model profiles found.[/yellow]")
+            console.print("Run 'cdc model add' to create one.")
+            return
+        
+        # Get default profile
+        default_profile = config.get_default_model_profile(api_config_name=api_config)
+        
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Name", style="cyan")
+        table.add_column("Model ID", style="green")
+        table.add_column("Input $/Mtok", justify="right", style="yellow")
+        table.add_column("Output $/Mtok", justify="right", style="yellow")
+        table.add_column("Scope", style="blue")
+        table.add_column("Description")
+        
+        for profile in profiles:
+            default_marker = " ⭐" if profile.name == default_profile else ""
+            scope = profile.api_config_name or "global"
+            
+            table.add_row(
+                profile.name + default_marker,
+                profile.model_id,
+                f"${profile.input_price_per_mtok:.2f}",
+                f"${profile.output_price_per_mtok:.2f}",
+                scope,
+                profile.description or ""
+            )
+        
+        console.print(table)
+        console.print(f"\n[dim]Default profile: {default_profile} ⭐[/dim]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@model.command('show')
+@click.argument('name')
+@click.pass_context
+def model_show(ctx: click.Context, name: str) -> None:
+    """Show model profile details."""
+    console = ctx.obj['console']
+    
+    try:
+        config = Config()
+        profile = config.get_model_profile(name)
+        
+        if not profile:
+            console.print(f"[red]Model profile '{name}' not found[/red]")
+            sys.exit(1)
+        
+        scope = profile.api_config_name or "global"
+        cost_1k_in = profile.input_price_per_mtok / 1000
+        cost_1k_out = profile.output_price_per_mtok / 1000
+        
+        console.print(Panel(
+            f"[bold]{profile.name}[/bold]\n\n"
+            f"[dim]{profile.description or 'No description'}[/dim]\n\n"
+            f"Model ID: [green]{profile.model_id}[/green]\n"
+            f"Scope: [blue]{scope}[/blue]\n\n"
+            f"Pricing:\n"
+            f"  Input:  ${profile.input_price_per_mtok:.2f}/Mtok (${cost_1k_in:.4f}/1K tokens)\n"
+            f"  Output: ${profile.output_price_per_mtok:.2f}/Mtok (${cost_1k_out:.4f}/1K tokens)\n\n"
+            f"Use cases: {', '.join(profile.use_cases) if profile.use_cases else 'None specified'}",
+            title="Model Profile",
+            border_style="blue"
+        ))
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@model.command('remove')
+@click.argument('name')
+@click.pass_context
+def model_remove(ctx: click.Context, name: str) -> None:
+    """Remove a model profile."""
+    console = ctx.obj['console']
+    
+    try:
+        config = Config()
+        if config.remove_model_profile(name):
+            console.print(f"[green]✓[/green] Model profile '{name}' removed")
+        else:
+            console.print(f"[red]Model profile '{name}' not found[/red]")
+            sys.exit(1)
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@model.command('set-default')
+@click.argument('name')
+@click.option('--api-config', help='Set default for specific API config')
+@click.pass_context
+def model_set_default(ctx: click.Context, name: str, api_config: Optional[str]) -> None:
+    """Set default model profile.
+    
+    Examples:
+      cdc model set-default smart
+      cdc model set-default enterprise-smart --api-config enterprise
+    """
+    console = ctx.obj['console']
+    
+    try:
+        config = Config()
+        
+        if api_config:
+            config.set_api_default_model_profile(api_config, name)
+            console.print(f"[green]✓[/green] Default model for API '{api_config}' set to: {name}")
+        else:
+            config.set_default_model_profile(name)
+            console.print(f"[green]✓[/green] Global default model set to: {name}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
 def generate() -> None:
     """Generate code, tests, and documentation."""
     pass
