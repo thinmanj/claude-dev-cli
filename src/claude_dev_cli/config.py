@@ -288,10 +288,14 @@ class Config:
         current = cwd
         while current != current.parent:
             config_file = current / ".claude-dev-cli"
-            if config_file.exists():
-                with open(config_file, 'r') as f:
-                    data = json.load(f)
-                    return ProjectProfile(**data)
+            if config_file.exists() and config_file.is_file():
+                try:
+                    with open(config_file, 'r') as f:
+                        data = json.load(f)
+                        return ProjectProfile(**data)
+                except (json.JSONDecodeError, IOError):
+                    # Skip invalid project config files
+                    pass
             current = current.parent
         
         return None

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-01-28
+
+### Fixed
+- **CRITICAL**: Fixed "Is a directory" error when ~/.claude-dev-cli exists as directory in $HOME
+- `get_project_profile()` now checks if .claude-dev-cli is a file before trying to open it
+- Added error handling to skip invalid project config files
+- This was the root cause of Errno 21 errors on Linux installations
+
 ## [0.8.7] - 2026-01-28
 
 ### Fixed
