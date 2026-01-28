@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-01-28
+
+### Fixed
+- Added directory validation to TemplateManager initialization
+- Fixed potential "Is a directory" errors for templates.json and templates directory
+- Completes comprehensive file/directory validation across all config paths
+
 ## [0.8.6] - 2026-01-28
 
 ### Fixed

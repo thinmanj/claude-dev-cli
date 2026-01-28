@@ -208,7 +208,23 @@ Include:
     def __init__(self, templates_dir: Path):
         self.templates_dir = templates_dir
         self.templates_file = templates_dir / "templates.json"
+        
+        # Check if templates_dir exists as a file (not directory)
+        if self.templates_dir.exists() and not self.templates_dir.is_dir():
+            raise RuntimeError(
+                f"Templates directory path {self.templates_dir} exists but is not a directory. "
+                f"Please remove or rename this file."
+            )
+        
         self.templates_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check if templates_file is a directory (not file)
+        if self.templates_file.exists() and self.templates_file.is_dir():
+            raise RuntimeError(
+                f"Templates file {self.templates_file} is a directory. "
+                f"Please remove this directory."
+            )
+        
         self._load_templates()
     
     def _load_templates(self) -> None:
