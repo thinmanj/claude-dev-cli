@@ -101,7 +101,7 @@ class ClaudeClient:
             system_prompt = project_profile.system_prompt
         
         kwargs: Dict[str, Any] = {
-            "model": model,
+            "model": resolved_model,
             "max_tokens": max_tokens,
             "temperature": temperature,
             "messages": [{"role": "user", "content": prompt}]

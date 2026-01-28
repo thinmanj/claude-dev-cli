@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-dev-cli"
-version = "0.10.0"
+version = "0.10.1"
 description = "A powerful CLI tool for developers using Claude AI with multi-API routing, test generation, code review, and usage tracking"
 readme = "README.md"
 requires-python = ">=3.9"

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-01-28
+
+### Fixed
+- **CRITICAL**: Fixed 400 error "model: Input should be a valid string"
+- Bug in `ClaudeClient.call()` was passing unresolved `model` parameter instead of `resolved_model`
+- This broke all commands after v0.10.0 release (generate docs, ask, review, etc.)
+- Model profile resolution now works correctly
+
 ## [0.10.0] - 2026-01-28
 
 ### Added
