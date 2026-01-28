@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-01-28
+
+### Added
+- **Multi-File Support**: All major commands now support multiple files, directories, and auto-detection
+  - Commands affected: `review`, `refactor`, `generate tests`, `generate docs`
+  - Can now process multiple files: `cdc review file1.py file2.py file3.py`
+  - Can process entire directories: `cdc review src/`
+  - Auto-detects git changes when no paths specified: `cdc review` (uses staged → modified → current dir)
+  - `--max-files N` option to limit number of files processed
+- **New Command**: `cdc git review` - Review git changes
+  - `--staged`: Review only staged changes
+  - `--branch <range>`: Review branch changes (e.g., `main..HEAD`)
+  - `-i/--interactive`: Interactive follow-up questions
+  - Default behavior: Reviews all modified files
+- **Path Utilities Module**: `path_utils.py`
+  - `expand_paths()`: Expands directories/globs to code files (25+ extensions)
+  - `get_git_changes()`: Gets staged/modified/branch files from git
+  - `auto_detect_files()`: Auto-detects files based on git status
+  - `is_code_file()`: Filters by file extension
+  - Supports: `.py`, `.js`, `.ts`, `.go`, `.rs`, `.java`, `.cpp`, `.cs`, `.rb`, `.php`, and more
+
+### Changed
+- **Review command**: Now accepts `[PATHS]...` instead of single `file_path`
+- **Refactor command**: Now accepts `[PATHS]...` with auto-detection
+- **Generate tests command**: Now accepts `[PATHS]...`, max-files default: 10
+- **Generate docs command**: Now accepts `[PATHS]...`, max-files default: 10
+- All multi-file commands combine files into single prompt for batch processing
+- Output option (`-o`) only works with single file (warnings shown for multiple files)
+
+### Enhanced
+- Smart file list display: Shows first 5-10 files, then "... and N more"
+- Consistent UX across all commands
+- Auto-detection hierarchy: Staged files → Modified files → Current directory files
+- Respects `.gitignore` through git commands
+
+### Testing
+- Added 25 new tests for path_utils module
+- Total: 285 tests (25 new, 260 existing)
+- Tests cover: file expansion, git integration, auto-detection, edge cases
+- Note: 2 legacy CLI tests need updating for new multi-file signatures
+
+### Examples
+```bash
+# Review multiple files
+cdc review file1.py file2.py file3.py
+
+# Review directory
+cdc review src/
+
+# Auto-detect (reviews git changes)
+cdc review
+
+# Review git changes
+cdc git review --staged
+cdc git review --branch main..HEAD
+
+# Generate tests for directory
+cdc generate tests src/ --max-files 10
+
+# Refactor with auto-detection
+cdc refactor
+```
+
 ## [0.10.1] - 2026-01-28
 
 ### Fixed

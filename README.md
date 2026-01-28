@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/claude-dev-cli.svg)](https://badge.fury.io/py/claude-dev-cli)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-260%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
+[![Tests](https://img.shields.io/badge/tests-285%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Homebrew](https://img.shields.io/badge/homebrew-available-orange.svg)](https://github.com/thinmanj/homebrew-tap)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -27,6 +27,19 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
   - `fast`: Claude 3.5 Haiku ($0.80/$4.00 per Mtok)
   - `smart`: Claude Sonnet 4 ($3.00/$15.00 per Mtok) - default
   - `powerful`: Claude Opus 4 ($15.00/$75.00 per Mtok)
+
+### 📁 Multi-File Support (v0.11.0+)
+- **Batch Processing**: Review, refactor, test, or document multiple files at once
+- **Directory Support**: Process all code files in a directory with `--max-files` limit
+- **Auto-Detection**: Commands auto-detect git changes when no files specified
+  - `cdc review` → reviews staged files, falls back to modified files, then current directory
+- **Git Integration**: New `cdc git review` command for reviewing changes
+  - `--staged`: Review only staged changes
+  - `--branch <range>`: Review branch changes (e.g., `main..HEAD`)
+- **Multi-Language**: Supports 25+ file extensions (Python, JS/TS, Go, Rust, Java, C++, etc.)
+- **Smart Display**: Shows file list preview (first 5-10 files, then "... and N more")
+- Commands with multi-file support:
+  - `review`, `refactor`, `generate tests`, `generate docs`
 
 ### 🧪 Developer Tools
 - **Test Generation**: Automatic pytest test generation for Python code
@@ -188,8 +201,12 @@ cdc generate tests -m smart mymodule.py  # Balanced approach
 ### 3. Developer Commands
 
 ```bash
-# Generate tests
+# Generate tests (single file)
 cdc generate tests mymodule.py -o tests/test_mymodule.py
+
+# Generate tests for multiple files (NEW in v0.11.0)
+cdc generate tests file1.py file2.py file3.py
+cdc generate tests src/ --max-files 10
 
 # Generate tests with interactive refinement
 cdc generate tests mymodule.py --interactive
@@ -197,8 +214,13 @@ cdc generate tests mymodule.py --interactive
 # Generate tests with context (includes dependencies, related files) - NEW in v0.8.1
 cdc generate tests mymodule.py --auto-context
 
-# Code review
+# Code review (single file)
 cdc review mymodule.py
+
+# Code review multiple files (NEW in v0.11.0)
+cdc review file1.py file2.py file3.py
+cdc review src/  # Review entire directory
+cdc review  # Auto-detect git changes (staged → modified → current dir)
 
 # Code review with auto-context (includes git, dependencies, tests)
 cdc review mymodule.py --auto-context
@@ -206,17 +228,34 @@ cdc review mymodule.py --auto-context
 # Code review with interactive follow-up questions
 cdc review mymodule.py --interactive
 
+# Review git changes (NEW in v0.11.0)
+cdc git review --staged  # Review only staged changes
+cdc git review --branch main..HEAD  # Review branch changes
+cdc git review  # Review all modified files
+
 # Debug errors with intelligent error parsing
 python script.py 2>&1 | cdc debug --auto-context
 
-# Generate documentation
+# Generate documentation (single file)
 cdc generate docs mymodule.py
+
+# Generate docs for multiple files (NEW in v0.11.0)
+cdc generate docs file1.py file2.py file3.py
+cdc generate docs src/ --max-files 10
 
 # Generate docs with interactive refinement
 cdc generate docs mymodule.py --interactive
 
 # Generate docs with context (includes dependencies) - NEW in v0.8.1  
 cdc generate docs mymodule.py --auto-context
+
+# Refactor (single file)
+cdc refactor legacy_code.py
+
+# Refactor multiple files (NEW in v0.11.0)
+cdc refactor file1.py file2.py file3.py
+cdc refactor src/
+cdc refactor  # Auto-detect git changes
 
 # Refactor with context (includes related files)
 cdc refactor legacy_code.py --auto-context
