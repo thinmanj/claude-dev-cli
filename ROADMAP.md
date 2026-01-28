@@ -97,7 +97,7 @@ Automatic context gathering:
 - ✅ Smart compression with rolling summaries
 - ✅ Configurable thresholds and behavior
 - ✅ Token savings display
-- ✅ 257 tests passing (39 new)
+- ✅ 259 tests passing (39 new)
 
 ## Next: v0.9.0 - Team & Collaboration
 

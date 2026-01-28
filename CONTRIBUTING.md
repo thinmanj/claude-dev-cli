@@ -37,7 +37,7 @@ Thank you for your interest in contributing to Claude Dev CLI! This document pro
 
 ## Running Tests
 
-The project has 257 tests covering all functionality including conversation history, summarization, context intelligence, and core features.
+The project has 259 tests covering all functionality including conversation history, summarization, context intelligence, and core features.
 
 ### Run All Tests
 ```bash
