@@ -806,41 +806,83 @@ def generate() -> None:
 
 
 @generate.command('tests')
-@click.argument('file_path', type=click.Path(exists=True))
-@click.option('-o', '--output', type=click.Path(), help='Output file path')
+@click.argument('paths', nargs=-1, type=click.Path(exists=True))
+@click.option('-o', '--output', type=click.Path(), help='Output file path (single file only)')
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.option('--auto-context', is_flag=True, help='Include dependencies and related files')
+@click.option('--max-files', type=int, default=10, help='Maximum files to process (default: 10)')
 @click.pass_context
 def gen_tests(
     ctx: click.Context,
-    file_path: str,
+    paths: tuple,
     output: Optional[str],
     api: Optional[str],
     interactive: bool,
-    auto_context: bool
+    auto_context: bool,
+    max_files: int
 ) -> None:
-    """Generate pytest tests for a Python file."""
+    """Generate pytest tests for Python files.
+    
+    Can generate tests for multiple files or directories:
+    
+      cdc generate tests file1.py file2.py
+      cdc generate tests src/
+    """
     console = ctx.obj['console']
+    from claude_dev_cli.path_utils import expand_paths
     
     try:
+        if not paths:
+            console.print("[yellow]No files specified. Provide file paths.[/yellow]")
+            return
+        
+        files = expand_paths(list(paths), max_files=max_files)
+        if not files:
+            console.print("[yellow]No files found.[/yellow]")
+            return
+        
+        # Output only works with single file
+        if output and len(files) > 1:
+            console.print("[yellow]Warning: --output only works with single file. Ignoring output option.[/yellow]")
+            output = None
+        
+        if len(files) > 1:
+            console.print(f"\n[bold]Generating tests for {len(files)} file(s):[/bold]")
+            for f in files[:5]:
+                console.print(f"  • {f}")
+            if len(files) > 5:
+                console.print(f"  ... and {len(files) - 5} more")
+            console.print()
+        
+        # Build combined prompt
+        files_content = ""
+        for file_path in files:
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                files_content += f"\n\n## File: {file_path}\n\n```\n{content}\n```\n"
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
+        
         if auto_context:
             from claude_dev_cli.context import ContextGatherer
             
             with console.status("[bold blue]Gathering context..."):
                 gatherer = ContextGatherer()
-                context = gatherer.gather_for_file(Path(file_path), include_git=False)
+                context = gatherer.gather_for_file(files[0], include_git=False)
                 context_info = context.format_for_prompt()
             
             console.print("[dim]✓ Context gathered (dependencies, related files)[/dim]")
             
-            # Use context-aware test generation
             client = ClaudeClient(api_config_name=api)
-            enhanced_prompt = f"{context_info}\n\nPlease generate comprehensive pytest tests for the main file, including fixtures, edge cases, and proper mocking where needed."
-            result = client.call(enhanced_prompt)
+            prompt = f"{context_info}\n\nFiles:{files_content}\n\nPlease generate comprehensive pytest tests for these files, including fixtures, edge cases, and proper mocking where needed."
         else:
-            with console.status("[bold blue]Generating tests..."):
-                result = generate_tests(file_path, api_config_name=api)
+            with console.status(f"[bold blue]Generating tests for {len(files)} file(s)..."):
+                client = ClaudeClient(api_config_name=api)
+                prompt = f"Files to test:{files_content}\n\nPlease generate comprehensive pytest tests for these files, including fixtures, edge cases, and proper mocking where needed."
+        
+        result = client.call(prompt)
         
         if interactive:
             # Show initial result
@@ -892,41 +934,83 @@ def gen_tests(
 
 
 @generate.command('docs')
-@click.argument('file_path', type=click.Path(exists=True))
-@click.option('-o', '--output', type=click.Path(), help='Output file path')
+@click.argument('paths', nargs=-1, type=click.Path(exists=True))
+@click.option('-o', '--output', type=click.Path(), help='Output file path (single file only)')
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.option('--auto-context', is_flag=True, help='Include dependencies and related files')
+@click.option('--max-files', type=int, default=10, help='Maximum files to process (default: 10)')
 @click.pass_context
 def gen_docs(
     ctx: click.Context,
-    file_path: str,
+    paths: tuple,
     output: Optional[str],
     api: Optional[str],
     interactive: bool,
-    auto_context: bool
+    auto_context: bool,
+    max_files: int
 ) -> None:
-    """Generate documentation for a Python file."""
+    """Generate documentation for files.
+    
+    Can generate docs for multiple files or directories:
+    
+      cdc generate docs file1.py file2.py
+      cdc generate docs src/
+    """
     console = ctx.obj['console']
+    from claude_dev_cli.path_utils import expand_paths
     
     try:
+        if not paths:
+            console.print("[yellow]No files specified. Provide file paths.[/yellow]")
+            return
+        
+        files = expand_paths(list(paths), max_files=max_files)
+        if not files:
+            console.print("[yellow]No files found.[/yellow]")
+            return
+        
+        # Output only works with single file
+        if output and len(files) > 1:
+            console.print("[yellow]Warning: --output only works with single file. Ignoring output option.[/yellow]")
+            output = None
+        
+        if len(files) > 1:
+            console.print(f"\n[bold]Generating docs for {len(files)} file(s):[/bold]")
+            for f in files[:5]:
+                console.print(f"  • {f}")
+            if len(files) > 5:
+                console.print(f"  ... and {len(files) - 5} more")
+            console.print()
+        
+        # Build combined prompt
+        files_content = ""
+        for file_path in files:
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                files_content += f"\n\n## File: {file_path}\n\n```\n{content}\n```\n"
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
+        
         if auto_context:
             from claude_dev_cli.context import ContextGatherer
             
             with console.status("[bold blue]Gathering context..."):
                 gatherer = ContextGatherer()
-                context = gatherer.gather_for_file(Path(file_path), include_git=False)
+                context = gatherer.gather_for_file(files[0], include_git=False)
                 context_info = context.format_for_prompt()
             
             console.print("[dim]✓ Context gathered (dependencies, related files)[/dim]")
             
-            # Use context-aware documentation generation
             client = ClaudeClient(api_config_name=api)
-            enhanced_prompt = f"{context_info}\n\nPlease generate comprehensive documentation for the main file, including API reference, usage examples, and integration notes."
-            result = client.call(enhanced_prompt)
+            prompt = f"{context_info}\n\nFiles:{files_content}\n\nPlease generate comprehensive documentation for these files, including API reference, usage examples, and integration notes."
         else:
-            with console.status("[bold blue]Generating documentation..."):
-                result = generate_docs(file_path, api_config_name=api)
+            with console.status(f"[bold blue]Generating documentation for {len(files)} file(s)..."):
+                client = ClaudeClient(api_config_name=api)
+                prompt = f"Files to document:{files_content}\n\nPlease generate comprehensive documentation for these files, including API reference, usage examples, and integration notes."
+        
+        result = client.call(prompt)
         
         if interactive:
             console.print("\n[bold]Initial Documentation:[/bold]\n")
@@ -1309,6 +1393,95 @@ def git_commit(ctx: click.Context, api: Optional[str], auto_context: bool) -> No
         
         console.print("\n[bold green]Suggested commit message:[/bold green]")
         console.print(Panel(result, border_style="green"))
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@git.command('review')
+@click.option('-a', '--api', help='API config to use')
+@click.option('--staged', is_flag=True, help='Review only staged changes')
+@click.option('--branch', help='Review changes in branch (e.g., main..HEAD)')
+@click.option('-i', '--interactive', is_flag=True, help='Interactive follow-up questions')
+@click.pass_context
+def git_review(
+    ctx: click.Context,
+    api: Optional[str],
+    staged: bool,
+    branch: Optional[str],
+    interactive: bool
+) -> None:
+    """Review git changes.
+    
+    Examples:
+      cdc git review --staged          # Review staged changes
+      cdc git review                   # Review all changes
+      cdc git review --branch main..HEAD  # Review branch changes
+    """
+    console = ctx.obj['console']
+    from claude_dev_cli.path_utils import get_git_changes
+    
+    try:
+        # Get changed files
+        if branch:
+            files = get_git_changes(commit_range=branch)
+            scope = f"branch {branch}"
+        elif staged:
+            files = get_git_changes(staged_only=True)
+            scope = "staged changes"
+        else:
+            files = get_git_changes(staged_only=False)
+            scope = "all changes"
+        
+        if not files:
+            console.print(f"[yellow]No changes found in {scope}.[/yellow]")
+            return
+        
+        console.print(f"\n[bold]Reviewing {len(files)} changed file(s) from {scope}:[/bold]")
+        for f in files[:10]:
+            console.print(f"  • {f}")
+        if len(files) > 10:
+            console.print(f"  ... and {len(files) - 10} more")
+        console.print()
+        
+        # Build files content
+        files_content = ""
+        for file_path in files:
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                files_content += f"\n\n## File: {file_path}\n\n```\n{content}\n```\n"
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
+        
+        # Review
+        with console.status(f"[bold blue]Reviewing {len(files)} file(s)..."):
+            client = ClaudeClient(api_config_name=api)
+            prompt = f"Changed files in {scope}:{files_content}\n\nPlease review these git changes for bugs, security issues, code quality, and potential improvements. Focus on what changed and why it might be problematic."
+            result = client.call(prompt)
+        
+        md = Markdown(result)
+        console.print(md)
+        
+        if interactive:
+            console.print("\n[dim]Ask follow-up questions about the review, or 'exit' to quit[/dim]")
+            
+            while True:
+                user_input = console.input("\n[cyan]You:[/cyan] ").strip()
+                
+                if user_input.lower() == 'exit':
+                    break
+                
+                if not user_input:
+                    continue
+                
+                follow_up_prompt = f"Code review:\n\n{result}\n\nChanged files:{files_content}\n\nUser question: {user_input}"
+                
+                console.print("\n[bold green]Claude:[/bold green] ", end='')
+                for chunk in client.call_streaming(follow_up_prompt):
+                    console.print(chunk, end='')
+                console.print()
     
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
