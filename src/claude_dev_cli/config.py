@@ -84,6 +84,13 @@ class Config:
     
     def _ensure_config_dir(self) -> None:
         """Ensure configuration directory exists."""
+        # Check if config_dir exists as a file (not directory)
+        if self.config_dir.exists() and not self.config_dir.is_dir():
+            raise RuntimeError(
+                f"Configuration path {self.config_dir} exists but is not a directory. "
+                f"Please remove or rename this file."
+            )
+        
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.usage_log.touch(exist_ok=True)
     
@@ -101,8 +108,28 @@ class Config:
             self._save_config(default_config)
             return default_config
         
-        with open(self.config_file, 'r') as f:
-            return json.load(f)
+        # Check if config_file is actually a directory
+        if self.config_file.is_dir():
+            raise RuntimeError(
+                f"Configuration file {self.config_file} is a directory. "
+                f"Please remove this directory."
+            )
+        
+        try:
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+                
+                # Ensure required keys exist (for backwards compatibility)
+                if "context" not in config:
+                    config["context"] = ContextConfig().model_dump()
+                if "summarization" not in config:
+                    config["summarization"] = SummarizationConfig().model_dump()
+                
+                return config
+        except (json.JSONDecodeError, IOError) as e:
+            raise RuntimeError(
+                f"Failed to load configuration from {self.config_file}: {e}"
+            )
     
     def _save_config(self, data: Optional[Dict] = None) -> None:
         """Save configuration to file."""

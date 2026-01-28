@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-01-28
+
+### Fixed
+- Improved config file/directory error handling with clear error messages
+- Fixed potential "Is a directory" error (Errno 21) when config path conflicts exist
+- Added validation to detect if config files are accidentally created as directories
+
+### Added
+- Tests for config directory/file conflict scenarios (2 new tests)
+- Total: 259 tests (was 257)
+
 ## [0.8.3] - 2025-01-09
 
 ### Added

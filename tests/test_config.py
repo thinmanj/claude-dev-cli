@@ -70,6 +70,28 @@ class TestConfig:
         assert config.config_dir.exists()
         assert config.usage_log.exists()
     
+    def test_config_dir_as_file_raises(self, temp_home: Path) -> None:
+        """Test that having config path as file raises error."""
+        # Create config path as a file instead of directory
+        config_path = temp_home / ".claude-dev-cli"
+        config_path.write_text("invalid file")
+        
+        with pytest.raises(RuntimeError, match="exists but is not a directory"):
+            Config()
+    
+    def test_config_file_as_dir_raises(self, temp_home: Path) -> None:
+        """Test that having config.json as directory raises error."""
+        # Create config directory
+        config_dir = temp_home / ".claude-dev-cli"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create config.json as a directory
+        config_file = config_dir / "config.json"
+        config_file.mkdir()
+        
+        with pytest.raises(RuntimeError, match="is a directory"):
+            Config()
+    
     def test_init_creates_default_config(self, temp_home: Path) -> None:
         """Test that Config.__init__ creates default config file."""
         config = Config()
