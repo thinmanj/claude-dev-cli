@@ -150,7 +150,8 @@ class TestClaudeClient:
                 log_entry = json.loads(f.read())
             
             assert log_entry["api_config"] == "personal"
-            assert log_entry["model"] == "claude-3-5-sonnet-20241022"
+            # Should log the resolved model ID from 'smart' profile
+            assert log_entry["model"] == "claude-sonnet-4-5-20250929"
             assert log_entry["input_tokens"] == 100
             assert log_entry["output_tokens"] == 200
             assert "timestamp" in log_entry

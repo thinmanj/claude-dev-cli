@@ -7,35 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.0-alpha] - 2026-01-28
+## [0.10.0] - 2026-01-28
 
-### Added (Alpha - Not yet fully integrated)
+### Added
 - **Model Profile System**: Create named model profiles with custom pricing
   - `ModelProfile` class with pricing per Mtok (input/output)
   - Support for global and API-specific profiles
   - Project-level model profile preferences
+  - Profile name resolution to model IDs (use `fast`, `smart`, `powerful` instead of full model IDs)
 - **CLI Commands**: `cdc model` command group
-  - `cdc model add <name> <model_id>`: Create model profile with pricing
-  - `cdc model list`: View all profiles with pricing table
+  - `cdc model add <name> <model_id>`: Create model profile with custom pricing
+  - `cdc model list [--api <name>]`: View all profiles with pricing table
   - `cdc model show <name>`: Detailed profile information
   - `cdc model remove <name>`: Delete profile
-  - `cdc model set-default <name>`: Set default (global or per-API)
+  - `cdc model set-default <name> [--api <name>]`: Set default (global or per-API)
 - **Default Profiles**: 3 built-in profiles
-  - `fast`: Haiku ($0.80/$4.00 per Mtok)
-  - `smart`: Sonnet 4 ($3.00/$15.00 per Mtok) - default
-  - `powerful`: Opus 4 ($15.00/$75.00 per Mtok)
+  - `fast`: Claude 3.5 Haiku ($0.80/$4.00 per Mtok)
+  - `smart`: Claude Sonnet 4 ($3.00/$15.00 per Mtok) - default
+  - `powerful`: Claude Opus 4 ($15.00/$75.00 per Mtok)
+- **Dynamic Pricing**: Usage tracking now uses model profile pricing
+  - Calculates costs from profile definitions instead of hardcoded values
+  - Supports per-API pricing differences
+  - Automatic fallback to Sonnet pricing for unknown models
+- **Model Resolution Hierarchy**:
+  1. Explicit `-m/--model` flag (profile name or model ID)
+  2. Project-specific model profile (`.claude-dev-cli`)
+  3. API-specific default model profile
+  4. Global default model profile
+  5. Legacy default model setting
 - **Multi-API Architecture**: Each API config can have its own default model profile
 - **Config Schema**: Added `model_profiles`, `default_model_profile` to config.json
 
 ### Changed
-- `APIConfig` now has `default_model_profile` field
-- `ProjectProfile` now has `model_profile` field
+- `APIConfig` now has `default_model_profile` field for per-API defaults
+- `ProjectProfile` now has `model_profile` field for per-project defaults
+- `ClaudeClient._resolve_model()` converts profile names to model IDs automatically
+- Usage tracking `_calculate_cost()` looks up pricing dynamically from profiles
+- Removed hardcoded `MODEL_PRICING` dictionary from usage.py
 
-### Note
-This is an ALPHA release. Model profiles are defined but not yet integrated with:
-- Usage tracking (still uses hardcoded pricing)
-- Model resolution (still uses raw model IDs)
-- These integrations coming in v0.10.0 final
+### Enhanced
+- You can now use profile names anywhere a model ID is accepted
+  - `cdc ask -m fast "question"` uses Haiku automatically
+  - `cdc ask -m smart "question"` uses Sonnet 4 automatically
+  - `cdc ask -m powerful "question"` uses Opus 4 automatically
+- Supports custom profiles with different pricing per API config
+- Profile-based pricing enables accurate cost tracking for custom models
+
+### Testing
+- All 260 tests passing
+- Updated tests to work with new model profile system
+- Tests validate dynamic pricing and model resolution
 
 ## [0.9.0] - 2026-01-28
 

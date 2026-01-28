@@ -13,16 +13,6 @@ from rich.panel import Panel
 from claude_dev_cli.config import Config
 
 
-# Pricing per 1M tokens (as of Dec 2024)
-MODEL_PRICING = {
-    "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},
-    "claude-3-5-sonnet-20240620": {"input": 3.00, "output": 15.00},
-    "claude-3-opus-20240229": {"input": 15.00, "output": 75.00},
-    "claude-3-sonnet-20240229": {"input": 3.00, "output": 15.00},
-    "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
-}
-
-
 class UsageTracker:
     """Track and display API usage statistics."""
     
@@ -62,13 +52,30 @@ class UsageTracker:
         
         return logs
     
-    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
-        """Calculate cost for a given usage."""
-        pricing = MODEL_PRICING.get(model, {"input": 3.00, "output": 15.00})
+    def _calculate_cost(
+        self,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        api_config_name: Optional[str] = None
+    ) -> float:
+        """Calculate cost for a given usage.
         
-        input_cost = (input_tokens / 1_000_000) * pricing["input"]
-        output_cost = (output_tokens / 1_000_000) * pricing["output"]
+        Looks up pricing from model profiles. Falls back to:
+        1. Finding profile with matching model_id
+        2. Default Sonnet pricing if no match found
+        """
+        # Try to find profile by model_id
+        profiles = self.config.list_model_profiles(api_config_name=api_config_name)
+        for profile in profiles:
+            if profile.model_id == model:
+                input_cost = (input_tokens / 1_000_000) * profile.input_price_per_mtok
+                output_cost = (output_tokens / 1_000_000) * profile.output_price_per_mtok
+                return input_cost + output_cost
         
+        # Fallback to default Sonnet pricing
+        input_cost = (input_tokens / 1_000_000) * 3.00
+        output_cost = (output_tokens / 1_000_000) * 15.00
         return input_cost + output_cost
     
     def display_usage(
@@ -101,7 +108,7 @@ class UsageTracker:
             api = entry["api_config"]
             date = entry["timestamp"][:10]
             
-            cost = self._calculate_cost(model, input_tokens, output_tokens)
+            cost = self._calculate_cost(model, input_tokens, output_tokens, api_config_name=api)
             
             total_input += input_tokens
             total_output += output_tokens

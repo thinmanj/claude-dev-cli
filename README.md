@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/claude-dev-cli.svg)](https://badge.fury.io/py/claude-dev-cli)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-259%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
+[![Tests](https://img.shields.io/badge/tests-260%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Homebrew](https://img.shields.io/badge/homebrew-available-orange.svg)](https://github.com/thinmanj/homebrew-tap)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -16,6 +16,17 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 - Route tasks to different Claude API keys (personal, client, enterprise)
 - Automatic API selection based on project configuration
 - Automatic migration from plaintext to secure storage
+
+### 🎯 Model Profiles (v0.10.0+)
+- **Named Profiles**: Use friendly names instead of full model IDs (`fast`, `smart`, `powerful`)
+- **Custom Pricing**: Define input/output costs per Mtok for accurate usage tracking
+- **API-Specific Profiles**: Different models and pricing per API config
+- **Project Defaults**: Set per-project model preferences
+- **Dynamic Resolution**: Profile names automatically resolve to model IDs
+- **Built-in Profiles**:
+  - `fast`: Claude 3.5 Haiku ($0.80/$4.00 per Mtok)
+  - `smart`: Claude Sonnet 4 ($3.00/$15.00 per Mtok) - default
+  - `powerful`: Claude Opus 4 ($15.00/$75.00 per Mtok)
 
 ### 🧪 Developer Tools
 - **Test Generation**: Automatic pytest test generation for Python code
@@ -119,8 +130,12 @@ cdc config migrate-keys
 ### 2. Basic Usage
 
 ```bash
-# Ask a question
+# Ask a question (uses 'smart' profile by default)
 cdc ask "explain asyncio in Python"
+
+# Use a specific model profile
+cdc ask -m fast "quick question"  # Uses Haiku (fast & cheap)
+cdc ask -m powerful "complex task"  # Uses Opus 4 (most capable)
 
 # With file context
 cdc ask -f mycode.py "review this code"
@@ -133,6 +148,41 @@ cdc interactive
 
 # Use specific API
 cdc ask -a client "generate tests for this function"
+```
+
+### 3. Model Profile Management (v0.10.0+)
+
+```bash
+# List available model profiles
+cdc model list
+# ┌───────────┬──────────────────────────┬────────┬────────┐
+# │ Profile   │ Model ID                 │ Input  │ Output │
+# │ fast      │ claude-3-5-haiku-...     │ $0.80  │ $4.00  │
+# │ smart     │ claude-sonnet-4-...      │ $3.00  │ $15.00 │ ← default
+# │ powerful  │ claude-opus-4-...        │ $15.00 │ $75.00 │
+# └───────────┴──────────────────────────┴────────┴────────┘
+
+# Add a custom profile
+cdc model add lightning claude-3-5-haiku-20241022 \
+  --input-price 0.80 --output-price 4.00 \
+  --description "Ultra-fast model for simple tasks"
+
+# Set default model profile
+cdc model set-default fast  # Use Haiku by default
+
+# Set default for specific API config
+cdc model set-default powerful --api enterprise  # Opus for enterprise API
+
+# Show profile details
+cdc model show smart
+
+# Remove a profile
+cdc model remove lightning
+
+# Use profiles in any command
+cdc ask -m fast "simple question"
+cdc review -m powerful complex_file.py  # More thorough review
+cdc generate tests -m smart mymodule.py  # Balanced approach
 ```
 
 ### 3. Developer Commands

@@ -8,7 +8,7 @@ from io import StringIO
 import pytest
 from rich.console import Console
 
-from claude_dev_cli.usage import UsageTracker, MODEL_PRICING
+from claude_dev_cli.usage import UsageTracker
 
 
 class TestUsageTracker:
@@ -120,17 +120,18 @@ class TestUsageTracker:
         assert cost == expected
     
     def test_calculate_cost_haiku(self) -> None:
-        """Test cost calculation for Haiku model."""
+        """Test cost calculation for Haiku model using model profiles."""
         tracker = UsageTracker()
         
+        # Use current Haiku model ID from default 'fast' profile
         cost = tracker._calculate_cost(
-            "claude-3-haiku-20240307",
+            "claude-3-5-haiku-20241022",
             input_tokens=1_000_000,
             output_tokens=1_000_000
         )
         
-        # Haiku: $0.25/M input, $1.25/M output
-        expected = (1_000_000 / 1_000_000) * 0.25 + (1_000_000 / 1_000_000) * 1.25
+        # Fast profile (Haiku 3.5): $0.80/M input, $4.00/M output
+        expected = (1_000_000 / 1_000_000) * 0.80 + (1_000_000 / 1_000_000) * 4.00
         assert cost == expected
     
     def test_calculate_cost_unknown_model(self) -> None:

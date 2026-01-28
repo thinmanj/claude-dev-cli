@@ -39,6 +39,44 @@ class ClaudeClient:
         self.model = self.config.get_model()
         self.max_tokens = self.config.get_max_tokens()
     
+    def _resolve_model(self, model_or_profile: Optional[str] = None) -> str:
+        """Resolve model profile name or ID to actual model ID.
+        
+        Resolution hierarchy:
+        1. Explicit model_or_profile parameter (if provided)
+        2. Project-specific model profile
+        3. API-specific default model profile
+        4. Global default model profile
+        5. Legacy default model setting
+        
+        Returns actual model ID for API calls.
+        """
+        # Start with explicit parameter or legacy model setting
+        profile_or_id = model_or_profile or self.model
+        
+        # If no explicit model, check hierarchical defaults
+        if not model_or_profile:
+            # Check project profile
+            project_profile = self.config.get_project_profile()
+            if project_profile and project_profile.model_profile:
+                profile_or_id = project_profile.model_profile
+            else:
+                # Get API or global default profile name
+                profile_or_id = self.config.get_default_model_profile(
+                    api_config_name=self.api_config.name
+                )
+        
+        # Try to resolve as profile name
+        profile = self.config.get_model_profile(
+            profile_or_id,
+            api_config_name=self.api_config.name
+        )
+        if profile:
+            return profile.model_id
+        
+        # Assume it's already a model ID
+        return profile_or_id
+    
     def call(
         self,
         prompt: str,
@@ -48,8 +86,13 @@ class ClaudeClient:
         temperature: float = 1.0,
         stream: bool = False
     ) -> str:
-        """Make a call to Claude API."""
-        model = model or self.model
+        """Make a call to Claude API.
+        
+        Args:
+            model: Model ID or profile name (e.g., 'fast', 'smart', 'powerful')
+        """
+        # Resolve profile name to model ID
+        resolved_model = self._resolve_model(model)
         max_tokens = max_tokens or self.max_tokens
         
         # Check project profile for system prompt
@@ -75,7 +118,7 @@ class ClaudeClient:
         self._log_usage(
             prompt=prompt,
             response=response,
-            model=model,
+            model=resolved_model,
             duration_ms=int((end_time - start_time).total_seconds() * 1000),
             api_config_name=self.api_config.name
         )
@@ -94,8 +137,13 @@ class ClaudeClient:
         max_tokens: Optional[int] = None,
         temperature: float = 1.0
     ):
-        """Make a streaming call to Claude API."""
-        model = model or self.model
+        """Make a streaming call to Claude API.
+        
+        Args:
+            model: Model ID or profile name (e.g., 'fast', 'smart', 'powerful')
+        """
+        # Resolve profile name to model ID
+        resolved_model = self._resolve_model(model)
         max_tokens = max_tokens or self.max_tokens
         
         # Check project profile for system prompt
@@ -104,7 +152,7 @@ class ClaudeClient:
             system_prompt = project_profile.system_prompt
         
         kwargs: Dict[str, Any] = {
-            "model": model,
+            "model": resolved_model,
             "max_tokens": max_tokens,
             "temperature": temperature,
             "messages": [{"role": "user", "content": prompt}]
