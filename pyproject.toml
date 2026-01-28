@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-dev-cli"
-version = "0.8.5"
+version = "0.8.6"
 description = "A powerful CLI tool for developers using Claude AI with multi-API routing, test generation, code review, and usage tracking"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -39,7 +39,7 @@ dependencies = [
 
 [project.optional-dependencies]
 toon = [
-    "toon-format>=0.9.0",
+    "toon-format>=0.1.0",
 ]
 plugins = [
     "pygments>=2.0.0",
@@ -49,7 +49,7 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
-    "toon-format>=0.9.0",
+    "toon-format>=0.1.0",
     "pygments>=2.0.0",
 ]
 

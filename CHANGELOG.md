@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-01-28
+
+### Fixed
+- Fixed dependency resolution issue causing pip/pipx to install old version (0.1.0)
+- Changed toon-format requirement from `>=0.9.0` to `>=0.1.0` (0.9.0 stable not available on PyPI)
+- This was causing pip dependency resolver to backtrack to oldest compatible version
+
 ## [0.8.5] - 2026-01-28
 
 ### Fixed
