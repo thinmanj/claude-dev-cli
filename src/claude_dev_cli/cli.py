@@ -977,22 +977,65 @@ def gen_docs(
 
 
 @main.command('review')
-@click.argument('file_path', type=click.Path(exists=True))
+@click.argument('paths', nargs=-1, type=click.Path(exists=True))
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive follow-up questions')
 @click.option('--auto-context', is_flag=True, help='Automatically include git, dependencies, and related files')
+@click.option('--max-files', type=int, default=20, help='Maximum files to review (default: 20)')
 @click.pass_context
 def review(
     ctx: click.Context,
-    file_path: str,
+    paths: tuple,
     api: Optional[str],
     interactive: bool,
-    auto_context: bool
+    auto_context: bool,
+    max_files: int
 ) -> None:
-    """Review code for bugs and improvements."""
+    """Review code for bugs and improvements.
+    
+    Can review multiple files, directories, or auto-detect git changes:
+    
+      cdc review file1.py file2.py    # Multiple files
+      cdc review src/                 # Directory
+      cdc review                      # Auto-detect git changes
+    """
     console = ctx.obj['console']
+    from claude_dev_cli.path_utils import expand_paths, auto_detect_files
     
     try:
+        # Determine files to review
+        if paths:
+            # Expand paths (handles directories, multiple files)
+            files = expand_paths(list(paths), max_files=max_files)
+        else:
+            # Auto-detect files from git
+            files = auto_detect_files()
+            if files:
+                console.print(f"[dim]Auto-detected {len(files)} file(s) from git changes[/dim]")
+        
+        if not files:
+            console.print("[yellow]No files to review. Specify files or make some changes.[/yellow]")
+            return
+        
+        # Show files being reviewed
+        if len(files) > 1:
+            console.print(f"\n[bold]Reviewing {len(files)} file(s):[/bold]")
+            for f in files[:10]:  # Show first 10
+                console.print(f"  • {f}")
+            if len(files) > 10:
+                console.print(f"  ... and {len(files) - 10} more")
+            console.print()
+        
+        # Build combined prompt for multiple files
+        files_content = ""
+        for file_path in files:
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                files_content += f"\n\n## File: {file_path}\n\n```\n{content}\n```\n"
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
+        
         # Gather context if requested
         context_info = ""
         if auto_context:
@@ -1000,31 +1043,24 @@ def review(
             
             with console.status("[bold blue]Gathering context..."):
                 gatherer = ContextGatherer()
-                context = gatherer.gather_for_review(Path(file_path))
+                # Use first file for context gathering
+                context = gatherer.gather_for_review(files[0])
                 context_info = context.format_for_prompt()
             
             console.print("[dim]✓ Context gathered (git, dependencies, tests)[/dim]")
         
-        with console.status("[bold blue]Reviewing code..."):
-            # If we have context, prepend it to the file analysis
+        with console.status(f"[bold blue]Reviewing {len(files)} file(s)..."):
+            client = ClaudeClient(api_config_name=api)
             if context_info:
-                # Read file separately for context-aware review
-                result = code_review(file_path, api_config_name=api)
-                # The context module already includes the file, so we use it differently
-                client = ClaudeClient(api_config_name=api)
-                enhanced_prompt = f"{context_info}\n\nPlease review this code for bugs and improvements."
-                result = client.call(enhanced_prompt)
+                prompt = f"{context_info}\n\nFiles to review:{files_content}\n\nPlease review this code for bugs and improvements."
             else:
-                result = code_review(file_path, api_config_name=api)
+                prompt = f"Files to review:{files_content}\n\nPlease review this code for bugs, security issues, and improvements."
+            result = client.call(prompt)
         
         md = Markdown(result)
         console.print(md)
         
         if interactive:
-            client = ClaudeClient(api_config_name=api)
-            with open(file_path, 'r') as f:
-                file_content = f.read()
-            
             console.print("\n[dim]Ask follow-up questions about the review, or 'exit' to quit[/dim]")
             
             while True:
@@ -1036,7 +1072,7 @@ def review(
                 if not user_input:
                     continue
                 
-                follow_up_prompt = f"Code review:\n\n{result}\n\nOriginal code:\n\n{file_content}\n\nUser question: {user_input}"
+                follow_up_prompt = f"Code review:\n\n{result}\n\nFiles:{files_content}\n\nUser question: {user_input}"
                 
                 console.print("\n[bold green]Claude:[/bold green] ", end='')
                 for chunk in client.call_streaming(follow_up_prompt):
@@ -1106,49 +1142,95 @@ def debug(
 
 
 @main.command('refactor')
-@click.argument('file_path', type=click.Path(exists=True))
-@click.option('-o', '--output', type=click.Path(), help='Output file path')
+@click.argument('paths', nargs=-1, type=click.Path(exists=True))
+@click.option('-o', '--output', type=click.Path(), help='Output file path (single file only)')
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.option('--auto-context', is_flag=True, help='Automatically include git, dependencies, and related files')
+@click.option('--max-files', type=int, default=20, help='Maximum files to refactor (default: 20)')
 @click.pass_context
 def refactor(
     ctx: click.Context,
-    file_path: str,
+    paths: tuple,
     output: Optional[str],
     api: Optional[str],
     interactive: bool,
-    auto_context: bool
+    auto_context: bool,
+    max_files: int
 ) -> None:
-    """Suggest refactoring improvements."""
+    """Suggest refactoring improvements.
+    
+    Can refactor multiple files, directories, or auto-detect git changes:
+    
+      cdc refactor file1.py file2.py    # Multiple files
+      cdc refactor src/                 # Directory
+      cdc refactor                      # Auto-detect git changes
+    """
     console = ctx.obj['console']
+    from claude_dev_cli.path_utils import expand_paths, auto_detect_files
     
     try:
+        # Determine files to refactor
+        if paths:
+            files = expand_paths(list(paths), max_files=max_files)
+        else:
+            files = auto_detect_files()
+            if files:
+                console.print(f"[dim]Auto-detected {len(files)} file(s) from git changes[/dim]")
+        
+        if not files:
+            console.print("[yellow]No files to refactor. Specify files or make some changes.[/yellow]")
+            return
+        
+        # Output only works with single file
+        if output and len(files) > 1:
+            console.print("[yellow]Warning: --output only works with single file. Ignoring output option.[/yellow]")
+            output = None
+        
+        # Show files being refactored
+        if len(files) > 1:
+            console.print(f"\n[bold]Refactoring {len(files)} file(s):[/bold]")
+            for f in files[:10]:
+                console.print(f"  • {f}")
+            if len(files) > 10:
+                console.print(f"  ... and {len(files) - 10} more")
+            console.print()
+        
+        # Build combined prompt
+        files_content = ""
+        for file_path in files:
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                files_content += f"\n\n## File: {file_path}\n\n```\n{content}\n```\n"
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
+        
         # Gather context if requested
         if auto_context:
             from claude_dev_cli.context import ContextGatherer
             
             with console.status("[bold blue]Gathering context..."):
                 gatherer = ContextGatherer()
-                context = gatherer.gather_for_file(Path(file_path))
+                context = gatherer.gather_for_file(files[0])
                 context_info = context.format_for_prompt()
             
             console.print("[dim]✓ Context gathered[/dim]")
             
-            # Use context-aware refactoring
             client = ClaudeClient(api_config_name=api)
-            enhanced_prompt = f"{context_info}\n\nPlease suggest refactoring improvements for the main file."
-            result = client.call(enhanced_prompt)
+            prompt = f"{context_info}\n\nFiles:{files_content}\n\nPlease suggest refactoring improvements."
         else:
-            with console.status("[bold blue]Analyzing code..."):
-                result = refactor_code(file_path, api_config_name=api)
+            with console.status(f"[bold blue]Analyzing {len(files)} file(s)..."):
+                client = ClaudeClient(api_config_name=api)
+                prompt = f"Files to refactor:{files_content}\n\nPlease suggest refactoring improvements focusing on code quality, maintainability, and performance."
+        
+        result = client.call(prompt)
         
         if interactive:
             console.print("\n[bold]Initial Refactoring:[/bold]\n")
             md = Markdown(result)
             console.print(md)
             
-            client = ClaudeClient(api_config_name=api)
             conversation_context = [result]
             
             while True:
