@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-01-28
+
+### Fixed
+- Comprehensive file/directory conflict validation across all config paths
+- Fixed potential "Is a directory" errors for `usage.jsonl`, `.keyfile`, and `keys.enc`
+- Added validation for history directory path conflicts
+- Improved error messages with specific paths and clear resolution steps
+
+### Added
+- Additional validation in `SecureStorage` for encrypted file paths
+- Directory validation in `ConversationHistory` initialization
+- Test for usage.jsonl directory conflict (1 new test)
+- Total: 260 tests (was 259)
+
 ## [0.8.4] - 2026-01-28
 
 ### Fixed

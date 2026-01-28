@@ -114,6 +114,14 @@ class ConversationHistory:
     
     def __init__(self, history_dir: Path):
         self.history_dir = history_dir
+        
+        # Check if history_dir exists as a file (not directory)
+        if self.history_dir.exists() and not self.history_dir.is_dir():
+            raise RuntimeError(
+                f"History directory path {self.history_dir} exists but is not a directory. "
+                f"Please remove or rename this file."
+            )
+        
         self.history_dir.mkdir(parents=True, exist_ok=True)
     
     def _get_conversation_file(self, conversation_id: str) -> Path:

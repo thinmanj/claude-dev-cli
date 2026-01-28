@@ -77,6 +77,13 @@ class SecureStorage:
     
     def _ensure_encryption_key(self) -> None:
         """Ensure encryption key exists for fallback storage."""
+        # Check if key_file path is a directory
+        if self.key_file.exists() and self.key_file.is_dir():
+            raise RuntimeError(
+                f"Encryption key path {self.key_file} is a directory. "
+                f"Please remove this directory."
+            )
+        
         if not self.key_file.exists():
             # Generate a new encryption key
             key = Fernet.generate_key()
@@ -87,6 +94,11 @@ class SecureStorage:
     
     def _get_cipher(self) -> Fernet:
         """Get Fernet cipher for fallback encryption."""
+        if self.key_file.is_dir():
+            raise RuntimeError(
+                f"Encryption key path {self.key_file} is a directory. "
+                f"Please remove this directory."
+            )
         key = self.key_file.read_bytes()
         return Fernet(key)
     
@@ -94,6 +106,13 @@ class SecureStorage:
         """Load keys from encrypted fallback file."""
         if not self.encrypted_file.exists():
             return {}
+        
+        # Check if encrypted_file is a directory
+        if self.encrypted_file.is_dir():
+            raise RuntimeError(
+                f"Encrypted keys file {self.encrypted_file} is a directory. "
+                f"Please remove this directory."
+            )
         
         try:
             cipher = self._get_cipher()
@@ -106,6 +125,13 @@ class SecureStorage:
     
     def _save_encrypted_keys(self, keys: dict) -> None:
         """Save keys to encrypted fallback file."""
+        # Check if encrypted_file is a directory
+        if self.encrypted_file.exists() and self.encrypted_file.is_dir():
+            raise RuntimeError(
+                f"Encrypted keys file {self.encrypted_file} is a directory. "
+                f"Please remove this directory."
+            )
+        
         cipher = self._get_cipher()
         data = json.dumps(keys).encode()
         encrypted_data = cipher.encrypt(data)

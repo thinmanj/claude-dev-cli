@@ -92,6 +92,19 @@ class TestConfig:
         with pytest.raises(RuntimeError, match="is a directory"):
             Config()
     
+    def test_usage_log_as_dir_raises(self, temp_home: Path) -> None:
+        """Test that having usage.jsonl as directory raises error."""
+        # Create config directory
+        config_dir = temp_home / ".claude-dev-cli"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create usage.jsonl as a directory
+        usage_log = config_dir / "usage.jsonl"
+        usage_log.mkdir()
+        
+        with pytest.raises(RuntimeError, match="is a directory"):
+            Config()
+    
     def test_init_creates_default_config(self, temp_home: Path) -> None:
         """Test that Config.__init__ creates default config file."""
         config = Config()

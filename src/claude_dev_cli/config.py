@@ -92,6 +92,14 @@ class Config:
             )
         
         self.config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check if usage_log exists as a directory (not file)
+        if self.usage_log.exists() and self.usage_log.is_dir():
+            raise RuntimeError(
+                f"Usage log path {self.usage_log} is a directory. "
+                f"Please remove this directory."
+            )
+        
         self.usage_log.touch(exist_ok=True)
     
     def _load_config(self) -> Dict:
