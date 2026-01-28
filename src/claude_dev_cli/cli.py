@@ -579,6 +579,31 @@ def config_list(ctx: click.Context) -> None:
         if cfg.description:
             console.print(f"  {cfg.description}")
         console.print(f"  API Key: {cfg.api_key[:15]}...")
+    
+    # Show default model
+    console.print(f"\n[dim]Default model: {config.get_model()}[/dim]")
+
+
+@config.command('set-model')
+@click.argument('model')
+@click.pass_context
+def config_set_model(ctx: click.Context, model: str) -> None:
+    """Set the default Claude model.
+    
+    Examples:
+      cdc config set-model claude-sonnet-4-20250514
+      cdc config set-model claude-3-5-sonnet-20241022
+      cdc config set-model claude-opus-4-20250514
+    """
+    console = ctx.obj['console']
+    
+    try:
+        config = Config()
+        config.set_model(model)
+        console.print(f"[green]✓[/green] Default model set to: {model}")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
 
 
 @main.group()

@@ -108,7 +108,7 @@ class Config:
             default_config = {
                 "api_configs": [],
                 "project_profiles": [],
-                "default_model": "claude-3-5-sonnet-20241022",
+                "default_model": "claude-sonnet-4-5-20250929",
                 "max_tokens": 4096,
                 "context": ContextConfig().model_dump(),
                 "summarization": SummarizationConfig().model_dump(),
@@ -302,7 +302,12 @@ class Config:
     
     def get_model(self) -> str:
         """Get default model."""
-        return self._data.get("default_model", "claude-3-5-sonnet-20241022")
+        return self._data.get("default_model", "claude-sonnet-4-20250514")
+    
+    def set_model(self, model: str) -> None:
+        """Set default model."""
+        self._data["default_model"] = model
+        self._save_config()
     
     def get_max_tokens(self) -> int:
         """Get default max tokens."""

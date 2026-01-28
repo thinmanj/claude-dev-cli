@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-01-28
+
+### Added
+- **Model Configuration**: `cdc config set-model <model>` command to change default model
+- Display default model in `cdc config list`
+
+### Changed
+- Updated default model from `claude-3-5-sonnet-20241022` to `claude-sonnet-4-5-20250929`
+- This fixes 404 errors with deprecated model versions
+
 ## [0.8.8] - 2026-01-28
 
 ### Fixed

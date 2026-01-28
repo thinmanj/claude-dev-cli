@@ -115,7 +115,7 @@ class TestConfig:
             data = json.load(f)
         
         assert data["api_configs"] == []
-        assert data["default_model"] == "claude-3-5-sonnet-20241022"
+        assert data["default_model"] == "claude-sonnet-4-5-20250929"
         assert data["max_tokens"] == 4096
     
     def test_load_existing_config(self, config_file: Path) -> None:
