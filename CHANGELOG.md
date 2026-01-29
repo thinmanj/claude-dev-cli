@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-01-29
+
+### Fixed
+- **CRITICAL**: Fixed `ClaudeClient` instantiation bug in `generate code` and `generate feature` commands
+- Error: "ClaudeClient.__init__() got an unexpected keyword argument 'model'"
+- Bug was passing `model` parameter to `__init__()` instead of `.call()` method
+- Both commands now work correctly with model profiles (e.g., `-m fast`)
+
 ## [0.12.0] - 2026-01-29
 
 ### Added
