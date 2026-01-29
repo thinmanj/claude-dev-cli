@@ -314,13 +314,57 @@ Delete this file? (y/n/s=skip/q=quit) n  # For file deletions
 - `n, no` - Skip this hunk (keeps original)
 - `s, skip` - Skip remaining hunks in current file
 - `q, quit` - Stop reviewing and apply approved changes so far
+- `edit` - Open files in $EDITOR before applying
+- `save` - Save to custom location
 - `help` - Show help message
 
 **Benefits:**
 - Fine-grained control over changes
 - Keep original code for some hunks while applying others
 - Syntax-highlighted diffs for easy review
+- Edit files before applying for manual tweaks
+- Save to custom location without -o flag
 - Safe: only approved hunks are written
+
+### 3.2 Edit and Save Options (v0.13.2+)
+
+Before applying changes, you can edit files or save to custom locations:
+
+#### Edit in $EDITOR
+```bash
+cdc generate feature -f spec.md
+
+# At confirmation:
+Continue? (Y/n/preview/patch/edit/save/help) edit
+
+# Opens each file in your $EDITOR (vi, nano, code, etc.)
+# Make manual adjustments, save and close
+# Changes are applied after editing
+```
+
+#### Save to Custom Location
+```bash
+cdc generate code -d "REST API" -o /tmp/output
+
+# At confirmation:
+Continue? (Y/n/preview/patch/edit/save/help) save
+
+# Single file:
+Filename: my-custom-name.py  # Save to custom filename
+
+# Multiple files:
+Directory: /path/to/output/  # Save entire project elsewhere
+```
+
+**Use Cases:**
+- **Edit**: Make manual tweaks before applying (fix formatting, adjust logic)
+- **Save**: Try changes elsewhere before applying to project
+- **Edit + Preview**: Review, edit, then apply with confidence
+- **Save for later**: Generate code, save it, review offline, apply manually
+
+**Environment Variables:**
+- `$EDITOR`: Your preferred editor (e.g., `export EDITOR=nano`)
+- Defaults to `vi` if `$EDITOR` not set
 
 ### 4. Developer Commands
 

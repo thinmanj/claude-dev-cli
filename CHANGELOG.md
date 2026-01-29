@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-01-29
+
+### Added
+- **Edit Option**: Open files in `$EDITOR` before applying changes
+  - Interactive file editing at confirmation prompt
+  - Type 'edit' to open each file in your editor (vi, nano, code, emacs, etc.)
+  - Make manual adjustments, save and close
+  - Changes merged back and applied
+  - Respects `$EDITOR` environment variable (defaults to `vi`)
+  - Skips delete operations (can't edit deleted files)
+  - Each file edited individually in temp location
+  - Temp files automatically cleaned up
+
+- **Save Option**: Save to custom location interactively
+  - Alternative to `-o` flag with more flexibility
+  - Type 'save' at confirmation prompt
+  - Single file: prompts for custom filename
+  - Multiple files: prompts for output directory
+  - Creates parent directories automatically
+  - Relative paths resolved from base directory
+  - Skips delete operations
+  - Does not continue with original write (saves and exits)
+
+### Enhanced
+- **Confirmation Flow**: Updated prompt options
+  - New prompt: `(Y/n/preview/patch/edit/save/help)`
+  - Help text includes edit and save descriptions
+  - All file generation commands support edit/save
+  - Base path passed to confirmation for edit/save functionality
+
+- **User Experience**:
+  - Edit: Full control before applying changes
+  - Save: Try changes elsewhere before committing
+  - Edit + Preview workflow: review, edit, then apply
+  - Save for later workflow: generate, save, review offline
+  - Non-destructive operations
+
+### Use Cases
+```bash
+# Edit generated files before applying
+cdc generate feature -f spec.md
+# Type 'edit' at prompt to open in $EDITOR
+
+# Save to custom location
+cdc generate code -d "REST API" -o project/
+# Type 'save' at prompt, enter custom path
+
+# Combined workflow
+cdc refactor src/
+# Type 'preview' to review, 'edit' to adjust, then 'y' to apply
+```
+
+### Technical Details
+- `_edit_files()`: Subprocess integration with $EDITOR
+- `_save_to_location()`: Interactive path prompts with validation
+- Both methods handle single/multiple files
+- Confirmation method signature updated: `confirm(console, base_path)`
+- All command calls updated to pass base_path
+
 ## [0.13.1] - 2026-01-29
 
 ### Added
