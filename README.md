@@ -264,7 +264,63 @@ cdc generate feature --file spec.md --yes  # Apply without confirmation
 
 # Interactive feature implementation
 cdc generate feature --description "Add logging" src/ --interactive
+
+# Hunk-by-hunk approval (like git add -p) - NEW in v0.13.1
+cdc generate feature -f spec.md
+# At confirmation prompt, type 'patch' to review changes hunk-by-hunk
+# Options: y (yes), n (no), s (skip file), q (quit), help
 ```
+
+### 3.1 Interactive Diff Approval (v0.13.1+)
+
+When applying file modifications, you can review and approve changes hunk-by-hunk, similar to `git add -p`:
+
+```bash
+# After generating feature/refactor changes:
+cdc generate feature -f spec.md
+
+# At the confirmation prompt:
+Continue? (Y/n/preview/patch/help) patch
+
+# For each file:
+File: src/main.py
+Modify file (3 hunk(s))
+
+Hunk 1/3:
+[Shows diff with syntax highlighting]
+@@ -10,3 +10,5 @@
+ def main():
+-    print("old")
++    print("new")
++    logging.info("Started")
+
+Apply this hunk? (y/n/s=skip file/q=quit/help) y  # Approve this hunk
+
+Hunk 2/3:
+[Shows next diff]
+Apply this hunk? (y/n/s=skip file/q=quit/help) n  # Skip this hunk
+
+Hunk 3/3:
+[Shows final diff]
+Apply this hunk? (y/n/s=skip file/q=quit/help) s  # Skip remaining in file
+
+# File operations options:
+Create this file? (y/n/s=skip/q=quit) y  # For new files
+Delete this file? (y/n/s=skip/q=quit) n  # For file deletions
+```
+
+**Options:**
+- `y, yes` - Apply this hunk/file
+- `n, no` - Skip this hunk (keeps original)
+- `s, skip` - Skip remaining hunks in current file
+- `q, quit` - Stop reviewing and apply approved changes so far
+- `help` - Show help message
+
+**Benefits:**
+- Fine-grained control over changes
+- Keep original code for some hunks while applying others
+- Syntax-highlighted diffs for easy review
+- Safe: only approved hunks are written
 
 ### 4. Developer Commands
 

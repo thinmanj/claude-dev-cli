@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-01-29
+
+### Added
+- **Hunk-by-Hunk Diff Approval**: Interactive patch mode for file modifications (like `git add -p`)
+  - New `Hunk` dataclass to represent individual diff chunks
+  - `parse_hunks()`: Parses unified diffs into individual reviewable hunks
+  - `apply_approved_hunks()`: Applies only user-approved hunks to files
+  - `confirm_with_hunks()`: Interactive hunk-by-hunk confirmation flow
+  - New 'patch' option in confirmation prompt
+  - Per-hunk options: `y` (yes), `n` (no), `s` (skip file), `q` (quit), `help`
+  - Per-file options for create/delete: `y`, `n`, `s`, `q`
+  - Syntax-highlighted diff display using Rich
+
+### Enhanced
+- **Fine-Grained Control**: Review and approve changes at the hunk level
+  - Partial approval: Apply some hunks while keeping original code for others
+  - Skip entire files or quit early with partial changes applied
+  - Visual diff display with monokai theme and line numbers
+  - Clear indicators showing hunk progress ("Hunk 2/5")
+
+- **Safety Features**:
+  - Files with no approved hunks remain unchanged
+  - Dry-run shows hunk counts: "Would modify: file.py (2/3 hunks)"
+  - Skip messages: "Skipped: file.py (no hunks approved)"
+  - Only writes files when at least one hunk is approved
+
+- **User Experience**:
+  - Confirmation prompt updated: `(Y/n/preview/patch/help)`
+  - Help command explains all options
+  - Quit command (q) preserves already-approved changes
+  - Skip command (s) moves to next file
+
+### Testing
+- Added 7 new tests for hunk functionality
+- All 37 tests passing
+- Tests cover: hunk dataclass, parsing, approval states, partial application, file writing
+- Test scenarios: all approved, none approved, partial approval, skipped files
+
+### Examples
+```bash
+# Generate feature with hunk-by-hunk approval
+cdc generate feature -f spec.md
+# At prompt: Continue? (Y/n/preview/patch/help) patch
+# Review each hunk: Apply this hunk? (y/n/s/q/help)
+
+# Refactor with granular control
+cdc refactor src/
+# Type 'patch' at confirmation to review each change
+```
+
+### Technical Details
+- `Hunk` dataclass tracks: header, lines, old_start, old_count, new_start, new_count, approved
+- Hunk parsing uses regex: `@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`
+- Bottom-up hunk application to maintain correct line numbers
+- Partial hunk application rebuilds file from approved hunks only
+- Empty hunks list results in full file replacement (backward compatible)
+
 ## [0.13.0] - 2026-01-29
 
 ### Added
