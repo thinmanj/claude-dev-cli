@@ -1157,15 +1157,15 @@ def gen_code(
         
         # Generate code
         with console.status(f"[bold blue]Generating code..."):
-            client = ClaudeClient(api_config_name=api, model=model)
-            result = client.call(prompt)
+            client = ClaudeClient(api_config_name=api)
+            result = client.call(prompt, model=model)
         
         # Interactive refinement
         if interactive:
             console.print("\n[bold]Initial Code:[/bold]\n")
             console.print(result)
             
-            client = ClaudeClient(api_config_name=api, model=model)
+            client = ClaudeClient(api_config_name=api)
             conversation_context = [result]
             
             while True:
@@ -1188,7 +1188,7 @@ def gen_code(
                 
                 console.print("\n[bold green]Claude:[/bold green] ", end='')
                 response_parts = []
-                for chunk in client.call_streaming(refinement_prompt):
+                for chunk in client.call_streaming(refinement_prompt, model=model):
                     console.print(chunk, end='')
                     response_parts.append(chunk)
                 console.print()
@@ -1314,8 +1314,8 @@ def gen_feature(
         
         # Generate feature implementation
         with console.status(f"[bold blue]Analyzing codebase and generating feature implementation..."):
-            client = ClaudeClient(api_config_name=api, model=model)
-            result = client.call(prompt)
+            client = ClaudeClient(api_config_name=api)
+            result = client.call(prompt, model=model)
         
         # Show result
         from rich.markdown import Markdown
@@ -1329,7 +1329,7 @@ def gen_feature(
         
         # Interactive refinement
         if interactive:
-            client = ClaudeClient(api_config_name=api, model=model)
+            client = ClaudeClient(api_config_name=api)
             conversation_context = [result]
             
             while True:
@@ -1353,7 +1353,7 @@ def gen_feature(
                 
                 console.print("\n[bold green]Claude:[/bold green] ", end='')
                 response_parts = []
-                for chunk in client.call_streaming(refinement_prompt):
+                for chunk in client.call_streaming(refinement_prompt, model=model):
                     console.print(chunk, end='')
                     response_parts.append(chunk)
                 console.print()
