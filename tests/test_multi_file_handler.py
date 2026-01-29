@@ -501,21 +501,23 @@ echo "hello"
 
 
 def test_hunk_dataclass():
-    """Test Hunk dataclass creation."""
-    from claude_dev_cli.multi_file_handler import Hunk
+    """Test HunkWrapper dataclass creation."""
+    from claude_dev_cli.multi_file_handler import HunkWrapper
+    from unittest.mock import Mock
     
-    hunk = Hunk(
-        header="@@ -1,3 +1,3 @@",
-        lines=["-old line", "+new line", " context"],
-        old_start=1,
-        old_count=3,
-        new_start=1,
-        new_count=3
-    )
+    # Create a mock unidiff.Hunk object
+    mock_hunk = Mock()
+    mock_hunk.source_start = 1
+    mock_hunk.source_length = 3
+    mock_hunk.target_start = 1
+    mock_hunk.target_length = 3
+    mock_hunk.__str__ = lambda self: "@@ -1,3 +1,3 @@"
     
-    assert hunk.old_start == 1
-    assert hunk.approved is False
-    assert "@@ -1,3 +1,3 @@" in str(hunk)
+    wrapper = HunkWrapper(hunk=mock_hunk)
+    
+    assert wrapper.source_start == 1
+    assert wrapper.approved is False
+    assert "@@ -1,3 +1,3 @@" in str(wrapper)
 
 
 def test_parse_hunks(tmp_path):
@@ -544,7 +546,7 @@ line 4
     # Parse hunks
     file_change.parse_hunks()
     assert len(file_change.hunks) > 0
-    assert file_change.hunks[0].old_start >= 1
+    assert file_change.hunks[0].source_start >= 1
 
 
 def test_apply_approved_hunks_all(tmp_path):

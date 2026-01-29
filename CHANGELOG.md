@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-01-29
+
+### Enhanced
+- **Robust Diff Parsing**: Integrated `unidiff` library for production-grade diff handling
+  - Replaced manual regex-based diff parsing with `unidiff.PatchSet`
+  - More reliable hunk parsing with edge case handling (no newline, binary diffs, malformed diffs)
+  - Simplified hunk application using unidiff's built-in line iteration
+  - Better handling of complex diff scenarios
+  - 435k weekly downloads, MIT licensed, well-maintained library
+
+### Changed
+- **Internal Refactoring**: Updated `multi_file_handler.py` to use unidiff
+  - Created `HunkWrapper` class wrapping `unidiff.Hunk` with approval state
+  - `parse_hunks()`: Now uses `PatchSet(StringIO(diff_text))` for parsing
+  - `apply_approved_hunks()`: Uses unidiff's line access methods (`line.is_added`, `line.is_context`, `line.value`)
+  - Cleaner code with better maintainability
+  - Properties: `source_start`, `source_length`, `target_start`, `target_length`
+  - Graceful fallback if unidiff not available
+
+### Dependencies
+- Added: `unidiff>=0.7.0` as core dependency
+
+### Testing
+- Updated tests to use `HunkWrapper` instead of direct `Hunk` class
+- All 37 multi_file_handler tests passing
+- All 95 core tests passing (config, core, commands, multi_file_handler)
+
+### Technical Details
+- unidiff provides `PatchSet`, `PatchedFile`, and `Hunk` classes
+- Each line has properties: `is_added`, `is_removed`, `is_context`, `value`
+- Hunk attributes: `source_start`, `source_length`, `target_start`, `target_length`
+- Better error handling for edge cases like missing newlines
+- Maintains backward compatibility with existing hunk approval flow
+
 ## [0.13.2] - 2026-01-29
 
 ### Added

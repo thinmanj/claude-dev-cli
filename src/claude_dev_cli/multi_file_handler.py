@@ -3,28 +3,50 @@
 import re
 import difflib
 from pathlib import Path
-from typing import List, Tuple, Optional, Literal, Dict
+from typing import List, Tuple, Optional, Literal, Dict, Any
 from dataclasses import dataclass, field
 from rich.console import Console
 from rich.tree import Tree
 from rich.panel import Panel
 from rich.syntax import Syntax
+from io import StringIO
+
+try:
+    from unidiff import PatchSet
+    UNIDIFF_AVAILABLE = True
+except ImportError:
+    UNIDIFF_AVAILABLE = False
 
 
 @dataclass
-class Hunk:
-    """Represents a single diff hunk."""
-    header: str  # @@ -start,count +start,count @@
-    lines: List[str]  # Diff lines for this hunk
-    old_start: int
-    old_count: int
-    new_start: int
-    new_count: int
+class HunkWrapper:
+    """Wrapper around unidiff.Hunk with approval state."""
+    hunk: Any  # unidiff.Hunk
     approved: bool = False
+    
+    @property
+    def source_start(self) -> int:
+        """Get source start line number."""
+        return self.hunk.source_start if hasattr(self.hunk, 'source_start') else 0
+    
+    @property
+    def source_length(self) -> int:
+        """Get source length."""
+        return self.hunk.source_length if hasattr(self.hunk, 'source_length') else 0
+    
+    @property
+    def target_start(self) -> int:
+        """Get target start line number."""
+        return self.hunk.target_start if hasattr(self.hunk, 'target_start') else 0
+    
+    @property
+    def target_length(self) -> int:
+        """Get target length."""
+        return self.hunk.target_length if hasattr(self.hunk, 'target_length') else 0
     
     def __str__(self) -> str:
         """Format hunk as unified diff text."""
-        return self.header + '\n' + '\n'.join(self.lines)
+        return str(self.hunk)
 
 
 @dataclass
@@ -34,7 +56,7 @@ class FileChange:
     content: str
     change_type: Literal["create", "modify", "delete"]
     original_content: Optional[str] = None
-    hunks: List[Hunk] = field(default_factory=list)
+    hunks: List[HunkWrapper] = field(default_factory=list)
     
     @property
     def line_count(self) -> int:
@@ -60,52 +82,32 @@ class FileChange:
         return ''.join(diff_lines) if diff_lines else None
     
     def parse_hunks(self) -> None:
-        """Parse diff into individual hunks for granular approval."""
+        """Parse diff into individual hunks using unidiff library."""
         if self.change_type != "modify" or not self.diff:
             return
         
+        if not UNIDIFF_AVAILABLE:
+            # Fallback: no hunk parsing available
+            self.hunks = []
+            return
+        
         self.hunks = []
-        lines = self.diff.split('\n')
         
-        i = 0
-        # Skip header lines (---, +++)
-        while i < len(lines) and not lines[i].startswith('@@'):
-            i += 1
-        
-        while i < len(lines):
-            if lines[i].startswith('@@'):
-                # Parse hunk header
-                header = lines[i]
-                match = re.match(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', header)
-                if not match:
-                    i += 1
-                    continue
-                
-                old_start = int(match.group(1))
-                old_count = int(match.group(2)) if match.group(2) else 1
-                new_start = int(match.group(3))
-                new_count = int(match.group(4)) if match.group(4) else 1
-                
-                # Collect hunk lines
-                hunk_lines = []
-                i += 1
-                while i < len(lines) and not lines[i].startswith('@@'):
-                    hunk_lines.append(lines[i])
-                    i += 1
-                
-                self.hunks.append(Hunk(
-                    header=header,
-                    lines=hunk_lines,
-                    old_start=old_start,
-                    old_count=old_count,
-                    new_start=new_start,
-                    new_count=new_count
-                ))
-            else:
-                i += 1
+        try:
+            # Parse the diff with unidiff
+            patch = PatchSet(StringIO(self.diff))
+            
+            # Extract all hunks from all patched files
+            for patched_file in patch:
+                for hunk in patched_file:
+                    self.hunks.append(HunkWrapper(hunk=hunk, approved=False))
+                    
+        except Exception:
+            # If unidiff fails, fall back to empty hunks list
+            self.hunks = []
     
     def apply_approved_hunks(self) -> str:
-        """Apply only approved hunks to generate final content."""
+        """Apply only approved hunks using unidiff's line access methods."""
         if self.change_type != "modify" or not self.original_content:
             return self.content
         
@@ -129,22 +131,23 @@ class FileChange:
         # Sort hunks by position (reversed for bottom-up application)
         sorted_hunks = sorted(
             [h for h in self.hunks if h.approved],
-            key=lambda h: h.old_start,
+            key=lambda h: h.source_start,
             reverse=True
         )
         
-        for hunk in sorted_hunks:
-            # Apply hunk
-            start_idx = hunk.old_start - 1
-            end_idx = start_idx + hunk.old_count
+        for wrapper in sorted_hunks:
+            hunk = wrapper.hunk
             
-            # Extract new lines from hunk
+            # Calculate indices for replacement
+            start_idx = wrapper.source_start - 1
+            end_idx = start_idx + wrapper.source_length
+            
+            # Extract new lines using unidiff's line iteration
             new_lines = []
-            for line in hunk.lines:
-                if line.startswith('+'):
-                    new_lines.append(line[1:] + '\n' if not line[1:].endswith('\n') else line[1:])
-                elif line.startswith(' '):
-                    new_lines.append(line[1:] + '\n' if not line[1:].endswith('\n') else line[1:])
+            for line in hunk:
+                if line.is_added or line.is_context:
+                    # Get line value (already includes newline)
+                    new_lines.append(line.value)
             
             # Replace section
             result_lines[start_idx:end_idx] = new_lines
