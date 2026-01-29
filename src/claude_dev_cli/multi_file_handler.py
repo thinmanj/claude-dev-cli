@@ -3,11 +3,28 @@
 import re
 import difflib
 from pathlib import Path
-from typing import List, Tuple, Optional, Literal
-from dataclasses import dataclass
+from typing import List, Tuple, Optional, Literal, Dict
+from dataclasses import dataclass, field
 from rich.console import Console
 from rich.tree import Tree
 from rich.panel import Panel
+from rich.syntax import Syntax
+
+
+@dataclass
+class Hunk:
+    """Represents a single diff hunk."""
+    header: str  # @@ -start,count +start,count @@
+    lines: List[str]  # Diff lines for this hunk
+    old_start: int
+    old_count: int
+    new_start: int
+    new_count: int
+    approved: bool = False
+    
+    def __str__(self) -> str:
+        """Format hunk as unified diff text."""
+        return self.header + '\n' + '\n'.join(self.lines)
 
 
 @dataclass
@@ -17,6 +34,7 @@ class FileChange:
     content: str
     change_type: Literal["create", "modify", "delete"]
     original_content: Optional[str] = None
+    hunks: List[Hunk] = field(default_factory=list)
     
     @property
     def line_count(self) -> int:
@@ -36,11 +54,102 @@ class FileChange:
             original_lines,
             new_lines,
             fromfile=f"a/{self.path}",
-            tofile=f"b/{self.path}",
-            lineterm=''
+            tofile=f"b/{self.path}"
         ))
         
         return ''.join(diff_lines) if diff_lines else None
+    
+    def parse_hunks(self) -> None:
+        """Parse diff into individual hunks for granular approval."""
+        if self.change_type != "modify" or not self.diff:
+            return
+        
+        self.hunks = []
+        lines = self.diff.split('\n')
+        
+        i = 0
+        # Skip header lines (---, +++)
+        while i < len(lines) and not lines[i].startswith('@@'):
+            i += 1
+        
+        while i < len(lines):
+            if lines[i].startswith('@@'):
+                # Parse hunk header
+                header = lines[i]
+                match = re.match(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', header)
+                if not match:
+                    i += 1
+                    continue
+                
+                old_start = int(match.group(1))
+                old_count = int(match.group(2)) if match.group(2) else 1
+                new_start = int(match.group(3))
+                new_count = int(match.group(4)) if match.group(4) else 1
+                
+                # Collect hunk lines
+                hunk_lines = []
+                i += 1
+                while i < len(lines) and not lines[i].startswith('@@'):
+                    hunk_lines.append(lines[i])
+                    i += 1
+                
+                self.hunks.append(Hunk(
+                    header=header,
+                    lines=hunk_lines,
+                    old_start=old_start,
+                    old_count=old_count,
+                    new_start=new_start,
+                    new_count=new_count
+                ))
+            else:
+                i += 1
+    
+    def apply_approved_hunks(self) -> str:
+        """Apply only approved hunks to generate final content."""
+        if self.change_type != "modify" or not self.original_content:
+            return self.content
+        
+        # If no hunks parsed, caller decides what to do
+        # In write_all, we check if hunks exist before calling this
+        if not self.hunks:
+            return self.content
+        
+        # If no hunks approved, return original
+        if not any(h.approved for h in self.hunks):
+            return self.original_content
+        
+        # If all hunks approved, return new content
+        if all(h.approved for h in self.hunks):
+            return self.content
+        
+        # Apply only approved hunks
+        original_lines = self.original_content.splitlines(keepends=True)
+        result_lines = original_lines.copy()
+        
+        # Sort hunks by position (reversed for bottom-up application)
+        sorted_hunks = sorted(
+            [h for h in self.hunks if h.approved],
+            key=lambda h: h.old_start,
+            reverse=True
+        )
+        
+        for hunk in sorted_hunks:
+            # Apply hunk
+            start_idx = hunk.old_start - 1
+            end_idx = start_idx + hunk.old_count
+            
+            # Extract new lines from hunk
+            new_lines = []
+            for line in hunk.lines:
+                if line.startswith('+'):
+                    new_lines.append(line[1:] + '\n' if not line[1:].endswith('\n') else line[1:])
+                elif line.startswith(' '):
+                    new_lines.append(line[1:] + '\n' if not line[1:].endswith('\n') else line[1:])
+            
+            # Replace section
+            result_lines[start_idx:end_idx] = new_lines
+        
+        return ''.join(result_lines)
 
 
 class MultiFileResponse:
@@ -254,13 +363,25 @@ class MultiFileResponse:
         base_path.mkdir(parents=True, exist_ok=True)
         
         for file_change in self.files:
+            # Skip files marked for skipping
+            if hasattr(file_change, 'change_type') and file_change.change_type == 'skip':
+                continue
+            
+            # Skip empty content for create (marked as rejected)
+            if file_change.change_type == 'create' and not file_change.content:
+                continue
+            
             full_path = base_path / file_change.path
             
             if dry_run:
                 if file_change.change_type == 'create':
                     console.print(f"[dim]Would create: {file_change.path}[/dim]")
                 elif file_change.change_type == 'modify':
-                    console.print(f"[dim]Would modify: {file_change.path}[/dim]")
+                    if file_change.hunks and any(h.approved for h in file_change.hunks):
+                        approved_count = sum(1 for h in file_change.hunks if h.approved)
+                        console.print(f"[dim]Would modify: {file_change.path} ({approved_count}/{len(file_change.hunks)} hunks)[/dim]")
+                    else:
+                        console.print(f"[dim]Would modify: {file_change.path}[/dim]")
                 elif file_change.change_type == 'delete':
                     console.print(f"[dim]Would delete: {file_change.path}[/dim]")
                 continue
@@ -274,13 +395,25 @@ class MultiFileResponse:
                 # Create parent directories
                 full_path.parent.mkdir(parents=True, exist_ok=True)
                 
-                # Write file
-                full_path.write_text(file_change.content)
-                
-                if file_change.change_type == 'create':
-                    console.print(f"[green]✓[/green] Created: {file_change.path}")
-                elif file_change.change_type == 'modify':
-                    console.print(f"[yellow]✓[/yellow] Modified: {file_change.path}")
+                # For modify with hunks, apply only approved hunks
+                if file_change.change_type == 'modify' and file_change.hunks:
+                    # Only write if at least one hunk is approved
+                    if not any(h.approved for h in file_change.hunks):
+                        console.print(f"[dim]Skipped: {file_change.path} (no hunks approved)[/dim]")
+                        continue
+                    
+                    content_to_write = file_change.apply_approved_hunks()
+                    full_path.write_text(content_to_write)
+                    approved_count = sum(1 for h in file_change.hunks if h.approved)
+                    console.print(f"[yellow]✓[/yellow] Modified: {file_change.path} ({approved_count}/{len(file_change.hunks)} hunks)")
+                else:
+                    # Write file normally (no hunks or create operation)
+                    full_path.write_text(file_change.content)
+                    
+                    if file_change.change_type == 'create':
+                        console.print(f"[green]✓[/green] Created: {file_change.path}")
+                    elif file_change.change_type == 'modify':
+                        console.print(f"[yellow]✓[/yellow] Modified: {file_change.path}")
     
     def confirm(self, console: Console) -> bool:
         """Interactive confirmation prompt.
@@ -291,12 +424,15 @@ class MultiFileResponse:
             return False
         
         while True:
-            response = console.input("\n[cyan]Continue?[/cyan] [dim](Y/n/preview/help)[/dim] ").strip().lower()
+            response = console.input("\n[cyan]Continue?[/cyan] [dim](Y/n/preview/patch/help)[/dim] ").strip().lower()
             
             if response in ('y', 'yes', ''):
                 return True
             elif response in ('n', 'no'):
                 return False
+            elif response == 'patch':
+                # Use hunk-by-hunk confirmation
+                return self.confirm_with_hunks(console)
             elif response == 'preview':
                 # Show individual file contents
                 for i, file_change in enumerate(self.files, 1):
@@ -315,13 +451,127 @@ class MultiFileResponse:
             elif response == 'help':
                 console.print("""
 [bold]Options:[/bold]
-  y, yes    - Proceed with changes
-  n, no     - Cancel
+  y, yes    - Proceed with all changes
+  n, no     - Cancel all changes
+  patch     - Review changes hunk-by-hunk (like git add -p)
   preview   - Show file contents/diffs
   help      - Show this help
 """)
             else:
                 console.print("[red]Invalid response. Type 'help' for options.[/red]")
+    
+    def confirm_with_hunks(self, console: Console) -> bool:
+        """Interactive hunk-by-hunk confirmation (like git add -p).
+        
+        Returns True if at least some changes approved, False if all cancelled.
+        """
+        if not self.files:
+            return False
+        
+        # Parse hunks for all modify operations
+        for file_change in self.files:
+            if file_change.change_type == 'modify':
+                file_change.parse_hunks()
+        
+        has_any_approval = False
+        
+        for file_change in self.files:
+            console.print(f"\n[bold cyan]File:[/bold cyan] {file_change.path}")
+            
+            if file_change.change_type == 'create':
+                console.print(f"[green]Create new file ({file_change.line_count} lines)[/green]")
+                response = self._ask_file_action(console, "create")
+                if response == 'y':
+                    # Mark as approved (keep as-is)
+                    has_any_approval = True
+                elif response == 'n':
+                    # Remove from files list
+                    file_change.content = ''  # Mark for skip
+                elif response == 'q':
+                    return has_any_approval
+                    
+            elif file_change.change_type == 'delete':
+                console.print("[red]Delete file[/red]")
+                response = self._ask_file_action(console, "delete")
+                if response == 'y':
+                    has_any_approval = True
+                elif response == 'n':
+                    file_change.change_type = 'skip'  # Mark for skip
+                elif response == 'q':
+                    return has_any_approval
+                    
+            elif file_change.change_type == 'modify':
+                if not file_change.hunks:
+                    console.print("[yellow]No hunks to review[/yellow]")
+                    continue
+                
+                console.print(f"[yellow]Modify file ({len(file_change.hunks)} hunk(s))[/yellow]")
+                
+                for hunk_idx, hunk in enumerate(file_change.hunks, 1):
+                    console.print(f"\n[bold]Hunk {hunk_idx}/{len(file_change.hunks)}:[/bold]")
+                    
+                    # Show hunk with syntax highlighting
+                    hunk_text = str(hunk)
+                    console.print(Panel(
+                        Syntax(hunk_text, "diff", theme="monokai", line_numbers=False),
+                        border_style="yellow",
+                        title=f"[bold]{file_change.path}[/bold]"
+                    ))
+                    
+                    while True:
+                        response = console.input(
+                            "[cyan]Apply this hunk?[/cyan] [dim](y/n/s=skip file/q=quit/help)[/dim] "
+                        ).strip().lower()
+                        
+                        if response in ('y', 'yes', ''):
+                            hunk.approved = True
+                            has_any_approval = True
+                            break
+                        elif response in ('n', 'no'):
+                            hunk.approved = False
+                            break
+                        elif response in ('s', 'skip'):
+                            # Skip remaining hunks in this file
+                            break
+                        elif response in ('q', 'quit'):
+                            return has_any_approval
+                        elif response == 'help':
+                            console.print("""
+[bold]Hunk Options:[/bold]
+  y, yes   - Apply this hunk
+  n, no    - Skip this hunk
+  s, skip  - Skip remaining hunks in this file
+  q, quit  - Quit and apply approved hunks so far
+  help     - Show this help
+""")
+                        else:
+                            console.print("[red]Invalid response. Type 'help' for options.[/red]")
+                    
+                    if response in ('s', 'skip'):
+                        break
+        
+        return has_any_approval
+    
+    def _ask_file_action(self, console: Console, action: str) -> str:
+        """Ask for confirmation on file-level action.
+        
+        Returns: 'y' (yes), 'n' (no), 's' (skip), 'q' (quit)
+        """
+        while True:
+            response = console.input(
+                f"[cyan]{action.capitalize()} this file?[/cyan] [dim](y/n/s=skip/q=quit)[/dim] "
+            ).strip().lower()
+            
+            if response in ('y', 'yes', 'n', 'no', 's', 'skip', 'q', 'quit', ''):
+                if response == '':
+                    return 'y'
+                if response in ('skip',):
+                    return 's'
+                if response in ('quit',):
+                    return 'q'
+                return response[0]  # Return first character
+            else:
+                console.print("[red]Invalid response. Use y/n/s/q[/red]")
 
 
 def extract_code_blocks(text: str) -> List[Tuple[str, str, str]]:

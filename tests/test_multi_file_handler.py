@@ -498,3 +498,194 @@ echo "hello"
     
     assert len(multi.files) == 1
     assert "echo" in multi.files[0].content
+
+
+def test_hunk_dataclass():
+    """Test Hunk dataclass creation."""
+    from claude_dev_cli.multi_file_handler import Hunk
+    
+    hunk = Hunk(
+        header="@@ -1,3 +1,3 @@",
+        lines=["-old line", "+new line", " context"],
+        old_start=1,
+        old_count=3,
+        new_start=1,
+        new_count=3
+    )
+    
+    assert hunk.old_start == 1
+    assert hunk.approved is False
+    assert "@@ -1,3 +1,3 @@" in str(hunk)
+
+
+def test_parse_hunks(tmp_path):
+    """Test parsing diff into hunks."""
+    # Create original file
+    (tmp_path / "file.py").write_text("line 1\nline 2\nline 3\nline 4")
+    
+    response = """
+## Modify: file.py
+```python
+line 1
+line 2 modified
+line 3
+line 4
+```
+"""
+    
+    multi = MultiFileResponse()
+    multi.parse_response(response, base_path=tmp_path)
+    
+    assert len(multi.files) == 1
+    file_change = multi.files[0]
+    assert file_change.change_type == "modify"
+    assert file_change.diff is not None
+    
+    # Parse hunks
+    file_change.parse_hunks()
+    assert len(file_change.hunks) > 0
+    assert file_change.hunks[0].old_start >= 1
+
+
+def test_apply_approved_hunks_all(tmp_path):
+    """Test applying all approved hunks."""
+    original = "line 1\nline 2\nline 3"
+    (tmp_path / "file.py").write_text(original)
+    
+    response = """
+## Modify: file.py
+```python
+line 1 modified
+line 2
+line 3 modified
+```
+"""
+    
+    multi = MultiFileResponse()
+    multi.parse_response(response, base_path=tmp_path)
+    
+    file_change = multi.files[0]
+    file_change.parse_hunks()
+    
+    # Approve all hunks
+    for hunk in file_change.hunks:
+        hunk.approved = True
+    
+    result = file_change.apply_approved_hunks()
+    assert "modified" in result
+
+
+def test_apply_approved_hunks_none(tmp_path):
+    """Test applying no approved hunks returns original."""
+    original = "line 1\nline 2\nline 3"
+    (tmp_path / "file.py").write_text(original)
+    
+    response = """
+## Modify: file.py
+```python
+line 1 modified
+line 2
+line 3
+```
+"""
+    
+    multi = MultiFileResponse()
+    multi.parse_response(response, base_path=tmp_path)
+    
+    file_change = multi.files[0]
+    file_change.parse_hunks()
+    
+    # Don't approve any hunks
+    result = file_change.apply_approved_hunks()
+    assert result == file_change.original_content
+
+
+def test_apply_approved_hunks_partial(tmp_path):
+    """Test applying partial hunks."""
+    original = "line 1\nline 2\nline 3\nline 4"
+    (tmp_path / "file.py").write_text(original)
+    
+    response = """
+## Modify: file.py
+```python
+line 1 modified
+line 2 modified
+line 3 modified
+line 4 modified
+```
+"""
+    
+    multi = MultiFileResponse()
+    multi.parse_response(response, base_path=tmp_path)
+    
+    file_change = multi.files[0]
+    file_change.parse_hunks()
+    
+    if len(file_change.hunks) > 1:
+        # Approve only first hunk
+        file_change.hunks[0].approved = True
+        result = file_change.apply_approved_hunks()
+        # Should have some modifications but not all
+        assert result != file_change.original_content
+        assert result != file_change.content
+
+
+def test_write_all_with_hunks(tmp_path):
+    """Test writing files with approved hunks."""
+    original = "line 1\nline 2\nline 3"
+    (tmp_path / "file.py").write_text(original)
+    
+    response = """
+## Modify: file.py
+```python
+line 1 modified
+line 2
+line 3
+```
+"""
+    
+    multi = MultiFileResponse()
+    multi.parse_response(response, base_path=tmp_path)
+    
+    file_change = multi.files[0]
+    file_change.parse_hunks()
+    
+    # Approve all hunks
+    for hunk in file_change.hunks:
+        hunk.approved = True
+    
+    console = Mock()
+    multi.write_all(tmp_path, dry_run=False, console=console)
+    
+    # File should be modified
+    result_content = (tmp_path / "file.py").read_text()
+    assert "modified" in result_content
+
+
+def test_write_all_skips_rejected_hunks(tmp_path):
+    """Test that rejected hunks are not applied."""
+    original = "line 1\nline 2\nline 3"
+    (tmp_path / "file.py").write_text(original)
+    
+    response = """
+## Modify: file.py
+```python
+line 1 modified
+line 2
+line 3
+```
+"""
+    
+    multi = MultiFileResponse()
+    multi.parse_response(response, base_path=tmp_path)
+    
+    file_change = multi.files[0]
+    file_change.parse_hunks()
+    
+    # Don't approve any hunks
+    console = Mock()
+    multi.write_all(tmp_path, dry_run=False, console=console)
+    
+    # File should remain unchanged
+    result_content = (tmp_path / "file.py").read_text()
+    assert result_content == original
