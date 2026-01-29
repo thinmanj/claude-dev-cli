@@ -1303,6 +1303,8 @@ Use proper directory structure and include proper error handling, documentation,
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.option('--auto-context', is_flag=True, help='Include project context')
 @click.option('--preview', is_flag=True, help='Preview changes without applying')
+@click.option('--dry-run', is_flag=True, help='Show what would be changed without writing')
+@click.option('--yes', '-y', is_flag=True, help='Apply changes without confirmation')
 @click.pass_context
 def gen_feature(
     ctx: click.Context,
@@ -1316,7 +1318,9 @@ def gen_feature(
     api: Optional[str],
     interactive: bool,
     auto_context: bool,
-    preview: bool
+    preview: bool,
+    dry_run: bool,
+    yes: bool
 ) -> None:
     """Generate code to add a feature to existing project.
     
@@ -1327,6 +1331,8 @@ def gen_feature(
       cdc generate feature --file feature-spec.md
       cdc generate feature --pdf requirements.pdf --preview
       cdc generate feature --url https://example.com/spec src/
+      cdc generate feature -f spec.md --dry-run
+      cdc generate feature -f spec.md --yes
     """
     console = ctx.obj['console']
     from claude_dev_cli.input_sources import get_input_content
@@ -1376,15 +1382,19 @@ def gen_feature(
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
         
-        # Build prompt
+        # Build prompt with multi-file support
         prompt = f"Feature Specification:\n\n{spec_content}\n\n"
         prompt += f"Existing Codebase:{codebase_content}\n\n"
-        prompt += "Analyze the existing code and provide:\n"
-        prompt += "1. Implementation plan for the feature\n"
-        prompt += "2. List of files to modify or create\n"
-        prompt += "3. Complete code changes (diffs or new files)\n"
-        prompt += "4. Any necessary setup or configuration changes\n\n"
-        prompt += "Be specific and provide complete, working code."
+        prompt += "Analyze the existing code and provide the complete implementation.\n\n"
+        prompt += "IMPORTANT: Structure your response with file markers:\n"
+        prompt += "## File: path/to/file.ext\n"
+        prompt += "```language\n"
+        prompt += "// complete file content\n"
+        prompt += "```\n\n"
+        prompt += "Use '## Create: path/to/new.ext' for new files.\n"
+        prompt += "Use '## Modify: path/to/existing.ext' for changes to existing files.\n"
+        prompt += "Use '## Delete: path/to/old.ext' if files should be removed.\n\n"
+        prompt += "Provide complete, working code for all affected files."
         
         # Add context if requested
         if auto_context:
@@ -1403,39 +1413,32 @@ def gen_feature(
             client = ClaudeClient(api_config_name=api)
             result = client.call(prompt, model=model)
         
-        # Show result
-        from rich.markdown import Markdown
-        md = Markdown(result)
-        console.print(md)
-        
-        if preview:
-            console.print("\n[yellow]Preview mode - no changes applied[/yellow]")
-            console.print("[dim]Remove --preview flag to apply changes[/dim]")
-            return
-        
         # Interactive refinement
         if interactive:
+            from rich.markdown import Markdown
+            md = Markdown(result)
+            console.print(md)
+            
             client = ClaudeClient(api_config_name=api)
             conversation_context = [result]
             
             while True:
-                console.print("\n[dim]Ask for changes, 'apply' to confirm, or 'exit' to cancel[/dim]")
+                console.print("\n[dim]Ask for changes, 'save' to continue, or 'exit' to cancel[/dim]")
                 user_input = console.input("[cyan]You:[/cyan] ").strip()
                 
                 if user_input.lower() == 'exit':
                     console.print("[yellow]Cancelled[/yellow]")
                     return
                 
-                if user_input.lower() == 'apply':
-                    console.print("[green]✓[/green] Implementation plan ready")
-                    console.print("[dim]Apply the changes manually from the output above[/dim]")
-                    return
+                if user_input.lower() == 'save':
+                    result = conversation_context[-1]
+                    break
                 
                 if not user_input:
                     continue
                 
                 # Get refinement
-                refinement_prompt = f"Previous implementation plan:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated implementation."
+                refinement_prompt = f"Previous implementation:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated implementation with file markers."
                 
                 console.print("\n[bold green]Claude:[/bold green] ", end='')
                 response_parts = []
@@ -1446,9 +1449,54 @@ def gen_feature(
                 
                 result = ''.join(response_parts)
                 conversation_context.append(result)
-        else:
-            console.print("\n[green]✓[/green] Feature implementation generated")
-            console.print("[dim]Apply the changes manually from the output above[/dim]")
+        
+        # Parse multi-file response
+        from claude_dev_cli.multi_file_handler import MultiFileResponse
+        from pathlib import Path
+        
+        # Use current directory as base
+        base_path = Path.cwd()
+        
+        multi_file = MultiFileResponse()
+        multi_file.parse_response(result, base_path=base_path)
+        
+        if not multi_file.files:
+            # No structured output detected, show markdown
+            console.print("\n[yellow]No structured file output detected[/yellow]")
+            from rich.markdown import Markdown
+            md = Markdown(result)
+            console.print(md)
+            console.print("\n[dim]Apply the changes manually from the output above[/dim]")
+            return
+        
+        # Validate paths
+        errors = multi_file.validate_paths(base_path)
+        if errors:
+            console.print("[red]Path validation errors:[/red]")
+            for error in errors:
+                console.print(f"  • {error}")
+            sys.exit(1)
+        
+        # Show preview
+        multi_file.preview(console, base_path)
+        
+        # Handle preview/dry-run modes
+        if preview or dry_run:
+            console.print("\n[yellow]Preview mode - no changes applied[/yellow]")
+            if preview:
+                console.print("[dim]Remove --preview flag to apply changes[/dim]")
+            return
+        
+        # Confirm or auto-accept
+        if not yes:
+            if not multi_file.confirm(console):
+                console.print("[yellow]Cancelled[/yellow]")
+                return
+        
+        # Write files
+        multi_file.write_all(base_path, dry_run=False, console=console)
+        
+        console.print(f"\n[green]✓[/green] Feature implemented successfully")
     
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -1627,6 +1675,9 @@ def debug(
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.option('--auto-context', is_flag=True, help='Automatically include git, dependencies, and related files')
 @click.option('--max-files', type=int, default=20, help='Maximum files to refactor (default: 20)')
+@click.option('--preview', is_flag=True, help='Preview changes without applying')
+@click.option('--dry-run', is_flag=True, help='Show what would be changed without writing')
+@click.option('--yes', '-y', is_flag=True, help='Apply changes without confirmation')
 @click.pass_context
 def refactor(
     ctx: click.Context,
@@ -1635,7 +1686,10 @@ def refactor(
     api: Optional[str],
     interactive: bool,
     auto_context: bool,
-    max_files: int
+    max_files: int,
+    preview: bool,
+    dry_run: bool,
+    yes: bool
 ) -> None:
     """Suggest refactoring improvements.
     
@@ -1644,6 +1698,8 @@ def refactor(
       cdc refactor file1.py file2.py    # Multiple files
       cdc refactor src/                 # Directory
       cdc refactor                      # Auto-detect git changes
+      cdc refactor src/ --dry-run       # Preview changes
+      cdc refactor file.py --yes        # Apply without confirmation
     """
     console = ctx.obj['console']
     from claude_dev_cli.path_utils import expand_paths, auto_detect_files
@@ -1675,7 +1731,7 @@ def refactor(
                 console.print(f"  ... and {len(files) - 10} more")
             console.print()
         
-        # Build combined prompt
+        # Build combined prompt with multi-file support
         files_content = ""
         for file_path in files:
             try:
@@ -1684,6 +1740,16 @@ def refactor(
                 files_content += f"\n\n## File: {file_path}\n\n```\n{content}\n```\n"
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
+        
+        refactor_instructions = (
+            "\n\nIMPORTANT: Structure your response with file markers:\n"
+            "## File: path/to/file.ext\n"
+            "```language\n"
+            "// complete refactored file content\n"
+            "```\n\n"
+            "Use '## Modify: path/to/file.ext' to indicate files being refactored.\n"
+            "Provide complete, working refactored code for all files.\n"
+        )
         
         # Gather context if requested
         if auto_context:
@@ -1697,11 +1763,11 @@ def refactor(
             console.print("[dim]✓ Context gathered[/dim]")
             
             client = ClaudeClient(api_config_name=api)
-            prompt = f"{context_info}\n\nFiles:{files_content}\n\nPlease suggest refactoring improvements."
+            prompt = f"{context_info}\n\nFiles:{files_content}\n\nPlease suggest refactoring improvements.{refactor_instructions}"
         else:
             with console.status(f"[bold blue]Analyzing {len(files)} file(s)..."):
                 client = ClaudeClient(api_config_name=api)
-                prompt = f"Files to refactor:{files_content}\n\nPlease suggest refactoring improvements focusing on code quality, maintainability, and performance."
+                prompt = f"Files to refactor:{files_content}\n\nPlease suggest refactoring improvements focusing on code quality, maintainability, and performance.{refactor_instructions}"
         
         result = client.call(prompt)
         
@@ -1713,7 +1779,7 @@ def refactor(
             conversation_context = [result]
             
             while True:
-                console.print("\n[dim]Commands: 'save' to save and exit, 'exit' to discard, or ask for changes[/dim]")
+                console.print("\n[dim]Commands: 'save' to continue, 'exit' to discard, or ask for changes[/dim]")
                 user_input = console.input("[cyan]You:[/cyan] ").strip()
                 
                 if user_input.lower() == 'exit':
@@ -1727,7 +1793,7 @@ def refactor(
                 if not user_input:
                     continue
                 
-                refinement_prompt = f"Previous refactoring:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated refactoring suggestions."
+                refinement_prompt = f"Previous refactoring:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated refactoring with file markers."
                 
                 console.print("\n[bold green]Claude:[/bold green] ", end='')
                 response_parts = []
@@ -1739,13 +1805,64 @@ def refactor(
                 result = ''.join(response_parts)
                 conversation_context.append(result)
         
+        # Handle single file output mode (legacy behavior)
         if output:
-            with open(output, 'w') as f:
-                f.write(result)
-            console.print(f"\n[green]✓[/green] Refactored code saved to: {output}")
-        elif not interactive:
-            md = Markdown(result)
-            console.print(md)
+            if len(files) == 1:
+                with open(output, 'w') as f:
+                    f.write(result)
+                console.print(f"\n[green]✓[/green] Refactored code saved to: {output}")
+            else:
+                console.print("[yellow]Warning: --output only works with single file. Using multi-file mode.[/yellow]")
+                output = None
+        
+        # Parse multi-file response if output not specified
+        if not output:
+            from claude_dev_cli.multi_file_handler import MultiFileResponse
+            from pathlib import Path
+            
+            # Use current directory as base
+            base_path = Path.cwd()
+            
+            multi_file = MultiFileResponse()
+            multi_file.parse_response(result, base_path=base_path)
+            
+            if not multi_file.files:
+                # No structured output detected, show markdown
+                if not interactive:
+                    console.print("\n[yellow]No structured file output detected[/yellow]")
+                    md = Markdown(result)
+                    console.print(md)
+                    console.print("\n[dim]Apply the changes manually from the output above[/dim]")
+                return
+            
+            # Validate paths
+            errors = multi_file.validate_paths(base_path)
+            if errors:
+                console.print("[red]Path validation errors:[/red]")
+                for error in errors:
+                    console.print(f"  • {error}")
+                sys.exit(1)
+            
+            # Show preview
+            multi_file.preview(console, base_path)
+            
+            # Handle preview/dry-run modes
+            if preview or dry_run:
+                console.print("\n[yellow]Preview mode - no changes applied[/yellow]")
+                if preview:
+                    console.print("[dim]Remove --preview flag to apply changes[/dim]")
+                return
+            
+            # Confirm or auto-accept
+            if not yes:
+                if not multi_file.confirm(console):
+                    console.print("[yellow]Cancelled[/yellow]")
+                    return
+            
+            # Write files
+            multi_file.write_all(base_path, dry_run=False, console=console)
+            
+            console.print(f"\n[green]✓[/green] Refactoring applied successfully")
     
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
