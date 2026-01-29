@@ -1270,7 +1270,7 @@ Use proper directory structure and include proper error handling, documentation,
             
             # Confirm or auto-accept
             if not yes and not dry_run:
-                if not multi_file.confirm(console):
+                if not multi_file.confirm(console, output_path):
                     console.print("[yellow]Cancelled[/yellow]")
                     return
             
@@ -1489,7 +1489,7 @@ def gen_feature(
         
         # Confirm or auto-accept
         if not yes:
-            if not multi_file.confirm(console):
+            if not multi_file.confirm(console, base_path):
                 console.print("[yellow]Cancelled[/yellow]")
                 return
         
@@ -1855,7 +1855,7 @@ def refactor(
             
             # Confirm or auto-accept
             if not yes:
-                if not multi_file.confirm(console):
+                if not multi_file.confirm(console, base_path):
                     console.print("[yellow]Cancelled[/yellow]")
                     return
             

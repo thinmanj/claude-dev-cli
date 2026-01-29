@@ -415,8 +415,12 @@ class MultiFileResponse:
                     elif file_change.change_type == 'modify':
                         console.print(f"[yellow]✓[/yellow] Modified: {file_change.path}")
     
-    def confirm(self, console: Console) -> bool:
+    def confirm(self, console: Console, base_path: Optional[Path] = None) -> bool:
         """Interactive confirmation prompt.
+        
+        Args:
+            console: Rich console for output
+            base_path: Base directory for file operations (needed for edit/save)
         
         Returns True if user confirms, False otherwise.
         """
@@ -424,7 +428,7 @@ class MultiFileResponse:
             return False
         
         while True:
-            response = console.input("\n[cyan]Continue?[/cyan] [dim](Y/n/preview/patch/help)[/dim] ").strip().lower()
+            response = console.input("\n[cyan]Continue?[/cyan] [dim](Y/n/preview/patch/edit/save/help)[/dim] ").strip().lower()
             
             if response in ('y', 'yes', ''):
                 return True
@@ -433,6 +437,18 @@ class MultiFileResponse:
             elif response == 'patch':
                 # Use hunk-by-hunk confirmation
                 return self.confirm_with_hunks(console)
+            elif response == 'edit':
+                # Open files in editor for manual editing
+                if base_path:
+                    self._edit_files(console, base_path)
+                else:
+                    console.print("[red]Edit not available (no base path provided)[/red]")
+            elif response == 'save':
+                # Save to custom location
+                if base_path:
+                    return self._save_to_location(console, base_path)
+                else:
+                    console.print("[red]Save not available (no base path provided)[/red]")
             elif response == 'preview':
                 # Show individual file contents
                 for i, file_change in enumerate(self.files, 1):
@@ -454,6 +470,8 @@ class MultiFileResponse:
   y, yes    - Proceed with all changes
   n, no     - Cancel all changes
   patch     - Review changes hunk-by-hunk (like git add -p)
+  edit      - Open files in $EDITOR before applying
+  save      - Save to custom location/filename
   preview   - Show file contents/diffs
   help      - Show this help
 """)
@@ -572,6 +590,119 @@ class MultiFileResponse:
                 return response[0]  # Return first character
             else:
                 console.print("[red]Invalid response. Use y/n/s/q[/red]")
+    
+    def _edit_files(self, console: Console, base_path: Path) -> None:
+        """Open files in editor for manual editing before applying.
+        
+        Args:
+            console: Rich console for output
+            base_path: Base directory for file operations
+        """
+        import os
+        import subprocess
+        import tempfile
+        
+        editor = os.environ.get('EDITOR', 'vi')
+        
+        console.print(f"\n[cyan]Opening files in {editor}...[/cyan]")
+        console.print("[dim]Save and close editor to continue[/dim]\n")
+        
+        for file_change in self.files:
+            if file_change.change_type == 'delete':
+                console.print(f"[dim]Skipping delete operation: {file_change.path}[/dim]")
+                continue
+            
+            # Write content to temp file
+            with tempfile.NamedTemporaryFile(mode='w', suffix=f'_{Path(file_change.path).name}', delete=False) as tf:
+                tf.write(file_change.content)
+                temp_path = tf.name
+            
+            try:
+                console.print(f"[bold]Editing:[/bold] {file_change.path}")
+                
+                # Open in editor
+                result = subprocess.run([editor, temp_path])
+                
+                if result.returncode == 0:
+                    # Read edited content
+                    with open(temp_path, 'r') as f:
+                        edited_content = f.read()
+                    
+                    # Update file change with edited content
+                    file_change.content = edited_content
+                    console.print(f"[green]✓[/green] Updated: {file_change.path}")
+                else:
+                    console.print(f"[yellow]Editor exited with error, keeping original content[/yellow]")
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+        
+        console.print("\n[green]Editing complete![/green]")
+    
+    def _save_to_location(self, console: Console, base_path: Path) -> bool:
+        """Save files to custom location.
+        
+        Args:
+            console: Rich console for output
+            base_path: Base directory for file operations
+        
+        Returns: True if saved successfully, False otherwise
+        """
+        console.print("\n[cyan]Save options:[/cyan]")
+        
+        if len(self.files) == 1:
+            # Single file - ask for filename
+            console.print("[dim]Enter filename (or path) to save to:[/dim]")
+            filename = console.input("[cyan]Filename:[/cyan] ").strip()
+            
+            if not filename:
+                console.print("[yellow]Cancelled[/yellow]")
+                return False
+            
+            save_path = Path(filename)
+            if not save_path.is_absolute():
+                save_path = base_path / save_path
+            
+            # Create parent directories
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write file
+            file_change = self.files[0]
+            save_path.write_text(file_change.content)
+            console.print(f"[green]✓[/green] Saved to: {save_path}")
+            return False  # Don't continue with original write
+        else:
+            # Multiple files - ask for directory
+            console.print(f"[dim]Enter directory to save {len(self.files)} file(s) to:[/dim]")
+            dirname = console.input("[cyan]Directory:[/cyan] ").strip()
+            
+            if not dirname:
+                console.print("[yellow]Cancelled[/yellow]")
+                return False
+            
+            save_dir = Path(dirname)
+            if not save_dir.is_absolute():
+                save_dir = base_path / save_dir
+            
+            # Create directory
+            save_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Write all files
+            for file_change in self.files:
+                if file_change.change_type == 'delete':
+                    console.print(f"[dim]Skipping delete operation: {file_change.path}[/dim]")
+                    continue
+                
+                file_path = save_dir / file_change.path
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text(file_change.content)
+                console.print(f"[green]✓[/green] Saved: {file_path}")
+            
+            console.print(f"\n[green]All files saved to: {save_dir}[/green]")
+            return False  # Don't continue with original write
 
 
 def extract_code_blocks(text: str) -> List[Tuple[str, str, str]]:
