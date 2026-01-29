@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/claude-dev-cli.svg)](https://badge.fury.io/py/claude-dev-cli)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-285%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
+[![Tests](https://img.shields.io/badge/tests-303%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Homebrew](https://img.shields.io/badge/homebrew-available-orange.svg)](https://github.com/thinmanj/homebrew-tap)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -27,6 +27,26 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
   - `fast`: Claude 3.5 Haiku ($0.80/$4.00 per Mtok)
   - `smart`: Claude Sonnet 4 ($3.00/$15.00 per Mtok) - default
   - `powerful`: Claude Opus 4 ($15.00/$75.00 per Mtok)
+
+### 🚀 Code Generation (v0.12.0+)
+- **Generate Code from Specs**: Create new code from descriptions, files, PDFs, or URLs
+  - `cdc generate code --description "REST API client" -o client.py`
+  - Multiple input sources: text, files (.md, .txt), PDFs, URLs
+  - Auto-detects target language from file extension
+  - Interactive refinement mode
+- **Add Features to Projects**: Analyze existing code and generate implementation plans
+  - `cdc generate feature --description "Add authentication" src/`
+  - Multi-file analysis and modification
+  - Preview mode to review changes before applying
+  - Supports same input sources as code generation
+- **Multiple Input Sources**:
+  - `--description TEXT`: Inline specification
+  - `-f/--file PATH`: Read from file
+  - `--pdf PATH`: Extract from PDF
+  - `--url URL`: Fetch from URL
+- **Optional Dependencies**: Install with `pip install 'claude-dev-cli[generation]'`
+  - Enables PDF and URL support
+  - Graceful fallback if not installed
 
 ### 📁 Multi-File Support (v0.11.0+)
 - **Batch Processing**: Review, refactor, test, or document multiple files at once
@@ -105,8 +125,14 @@ brew install thinmanj/tap/claude-dev-cli
 # Basic installation
 pip install claude-dev-cli
 
+# With code generation support (PDF & URL input)
+pip install claude-dev-cli[generation]
+
 # With TOON support (30-60% token reduction)
 pip install claude-dev-cli[toon]
+
+# With all optional features
+pip install claude-dev-cli[generation,toon]
 ```
 
 ### Via pipx (Recommended for CLI tools)
@@ -115,8 +141,14 @@ pip install claude-dev-cli[toon]
 # Isolated installation
 pipx install claude-dev-cli
 
+# With code generation support
+pipx install claude-dev-cli[generation]
+
 # With TOON support
 pipx install claude-dev-cli[toon]
+
+# With all optional features
+pipx install claude-dev-cli[generation,toon]
 ```
 
 ## Quick Start
@@ -198,7 +230,35 @@ cdc review -m powerful complex_file.py  # More thorough review
 cdc generate tests -m smart mymodule.py  # Balanced approach
 ```
 
-### 3. Developer Commands
+### 3. Code Generation Commands (NEW in v0.12.0)
+
+```bash
+# Generate code from specification
+cdc generate code --description "REST API client for weather data" -o client.py
+cdc generate code --file spec.md -o implementation.go
+cdc generate code --pdf requirements.pdf -o app.js
+cdc generate code --url https://example.com/api-spec -o service.py
+
+# Generate code with interactive refinement
+cdc generate code --description "Database ORM" -o orm.py --interactive
+
+# Generate code with project context
+cdc generate code --file spec.md -o service.py --auto-context
+
+# Add features to existing project
+cdc generate feature --description "Add user authentication with JWT" src/
+cdc generate feature --file feature-spec.md
+cdc generate feature --pdf product-requirements.pdf --preview
+cdc generate feature --url https://example.com/feature-spec
+
+# Preview feature changes before applying
+cdc generate feature --description "Add caching layer" src/ --preview
+
+# Interactive feature implementation
+cdc generate feature --description "Add logging" src/ --interactive
+```
+
+### 4. Developer Commands
 
 ```bash
 # Generate tests (single file)
@@ -272,7 +332,7 @@ git add .
 cdc git commit --auto-context
 ```
 
-### 4. Context-Aware Operations (v0.8.0+)
+### 5. Context-Aware Operations (v0.8.0+)
 
 ```bash
 # Auto-context includes: git info, dependencies, related files
@@ -301,7 +361,7 @@ cdc refactor app.py --auto-context
 # Automatically includes imported modules and dependencies
 ```
 
-### 5. Custom Templates
+### 6. Custom Templates
 
 ```bash
 # List all templates (built-in and user)

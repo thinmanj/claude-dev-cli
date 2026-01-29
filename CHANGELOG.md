@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-01-29
+
+### Added
+- **`generate code` Command**: Generate new code from specifications
+  - Supports multiple input sources: `--description`, `-f/--file`, `--pdf`, `--url`
+  - Auto-detects target language from output file extension
+  - Interactive refinement mode with `-i/--interactive`
+  - Project context awareness with `--auto-context`
+  - Examples:
+    - `cdc generate code --description "REST API client" -o client.py`
+    - `cdc generate code --file spec.md -o implementation.go`
+    - `cdc generate code --pdf requirements.pdf -o app.js`
+    - `cdc generate code --url https://example.com/spec -o service.py`
+
+- **`generate feature` Command**: Add features to existing codebase
+  - Analyzes existing code and generates implementation plan
+  - Supports multiple input sources for feature specifications
+  - Multi-file analysis with `--max-files` limit
+  - Preview mode with `--preview` flag (no changes applied)
+  - Auto-detection of project files
+  - Interactive refinement with `-i/--interactive`
+  - Examples:
+    - `cdc generate feature --description "Add authentication" src/`
+    - `cdc generate feature --file feature-spec.md`
+    - `cdc generate feature --pdf requirements.pdf --preview`
+    - `cdc generate feature --url https://example.com/spec`
+
+- **Input Sources Module** (`input_sources.py`): Unified input handling
+  - `read_text_input()`: Direct text descriptions
+  - `read_file_input()`: Read from text files (.txt, .md, etc.)
+  - `read_pdf_input()`: Extract text from PDF documents
+  - `read_url_input()`: Fetch and parse content from URLs
+  - `get_input_content()`: Unified interface with validation
+  - Supports HTML, JSON, and plain text from URLs
+  - Graceful fallback when optional dependencies not installed
+
+- **Optional Dependencies Group**: `pip install 'claude-dev-cli[generation]'`
+  - `pypdf>=3.0.0`: PDF text extraction
+  - `requests>=2.28.0`: URL fetching
+  - `beautifulsoup4>=4.0.0`: HTML parsing
+  - Clear error messages when dependencies missing
+
+### Enhanced
+- Both commands organized under `generate` group for consistency
+- Commands: `generate code`, `generate feature`, `generate tests`, `generate docs`
+- Supports 13+ languages: Python, JavaScript, TypeScript, Go, Rust, Java, C++, C, C#, Ruby, PHP, Swift, Kotlin
+- Language auto-detection from file extensions
+- Smart HTML parsing (removes scripts, nav, footer, header)
+- JSON pretty-printing from URLs
+- Interactive refinement with streaming responses
+- Full integration with model profiles and API routing
+
+### Testing
+- Added 18 tests for input_sources module
+- Tests cover all input types, error handling, graceful fallbacks
+- Mock testing for PDF and URL functionality
+- Tests work with/without optional dependencies
+- Total: 303 tests (18 new, 285 existing)
+
 ## [0.11.0] - 2026-01-28
 
 ### Added

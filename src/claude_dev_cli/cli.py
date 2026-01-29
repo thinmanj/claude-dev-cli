@@ -1060,6 +1060,315 @@ def gen_docs(
         sys.exit(1)
 
 
+@generate.command('code')
+@click.option('--description', help='Inline code specification')
+@click.option('-f', '--file', 'spec_file', type=click.Path(exists=True), help='Read specification from file')
+@click.option('--pdf', type=click.Path(exists=True), help='Read specification from PDF')
+@click.option('--url', help='Fetch specification from URL')
+@click.option('-o', '--output', required=True, type=click.Path(), help='Output file path (required)')
+@click.option('--language', help='Target language (auto-detected from output extension)')
+@click.option('-m', '--model', help='Model profile to use')
+@click.option('-a', '--api', help='API config to use')
+@click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
+@click.option('--auto-context', is_flag=True, help='Include project context')
+@click.pass_context
+def gen_code(
+    ctx: click.Context,
+    description: Optional[str],
+    spec_file: Optional[str],
+    pdf: Optional[str],
+    url: Optional[str],
+    output: str,
+    language: Optional[str],
+    model: Optional[str],
+    api: Optional[str],
+    interactive: bool,
+    auto_context: bool
+) -> None:
+    """Generate code from a specification.
+    
+    Reads specification from text, file, PDF, or URL and generates complete code.
+    
+    Examples:
+      cdc generate code --description "REST API client" -o client.py
+      cdc generate code --file spec.md -o implementation.go
+      cdc generate code --pdf requirements.pdf -o app.js
+      cdc generate code --url https://example.com/spec -o service.py
+    """
+    console = ctx.obj['console']
+    from claude_dev_cli.input_sources import get_input_content
+    from pathlib import Path
+    
+    try:
+        # Get specification content
+        spec_content, source_desc = get_input_content(
+            description=description,
+            file_path=spec_file,
+            pdf_path=pdf,
+            url=url,
+            console=console
+        )
+        
+        # Detect language from output extension if not specified
+        if not language:
+            ext = Path(output).suffix.lstrip('.')
+            language_map = {
+                'py': 'Python',
+                'js': 'JavaScript',
+                'ts': 'TypeScript',
+                'go': 'Go',
+                'rs': 'Rust',
+                'java': 'Java',
+                'cpp': 'C++',
+                'c': 'C',
+                'cs': 'C#',
+                'rb': 'Ruby',
+                'php': 'PHP',
+                'swift': 'Swift',
+                'kt': 'Kotlin',
+            }
+            language = language_map.get(ext, ext.upper() if ext else None)
+        
+        console.print(f"[cyan]Generating code from:[/cyan] {source_desc}")
+        if language:
+            console.print(f"[cyan]Target language:[/cyan] {language}")
+        console.print(f"[cyan]Output:[/cyan] {output}\n")
+        
+        # Build prompt
+        prompt = f"Specification:\n\n{spec_content}\n\n"
+        if language:
+            prompt += f"Generate complete, production-ready {language} code that implements this specification. "
+        else:
+            prompt += "Generate complete, production-ready code that implements this specification. "
+        prompt += "Include proper error handling, documentation, and best practices."
+        
+        # Add context if requested
+        if auto_context:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering project context..."):
+                gatherer = ContextGatherer()
+                # Gather context from current directory
+                context = gatherer.gather_for_file(".", include_git=True)
+                context_info = context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered[/dim]")
+            prompt = f"{context_info}\n\n{prompt}"
+        
+        # Generate code
+        with console.status(f"[bold blue]Generating code..."):
+            client = ClaudeClient(api_config_name=api, model=model)
+            result = client.call(prompt)
+        
+        # Interactive refinement
+        if interactive:
+            console.print("\n[bold]Initial Code:[/bold]\n")
+            console.print(result)
+            
+            client = ClaudeClient(api_config_name=api, model=model)
+            conversation_context = [result]
+            
+            while True:
+                console.print("\n[dim]Commands: 'save' to save and exit, 'exit' to discard, or ask for changes[/dim]")
+                user_input = console.input("[cyan]You:[/cyan] ").strip()
+                
+                if user_input.lower() == 'exit':
+                    console.print("[yellow]Discarded changes[/yellow]")
+                    return
+                
+                if user_input.lower() == 'save':
+                    result = conversation_context[-1]
+                    break
+                
+                if not user_input:
+                    continue
+                
+                # Get refinement
+                refinement_prompt = f"Previous code:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated code."
+                
+                console.print("\n[bold green]Claude:[/bold green] ", end='')
+                response_parts = []
+                for chunk in client.call_streaming(refinement_prompt):
+                    console.print(chunk, end='')
+                    response_parts.append(chunk)
+                console.print()
+                
+                result = ''.join(response_parts)
+                conversation_context.append(result)
+        
+        # Save output
+        Path(output).write_text(result)
+        console.print(f"\n[green]✓[/green] Code saved to: {output}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@generate.command('feature')
+@click.argument('paths', nargs=-1, type=click.Path(exists=True))
+@click.option('--description', help='Inline feature specification')
+@click.option('-f', '--file', 'spec_file', type=click.Path(exists=True), help='Read specification from file')
+@click.option('--pdf', type=click.Path(exists=True), help='Read specification from PDF')
+@click.option('--url', help='Fetch specification from URL')
+@click.option('--max-files', type=int, default=10, help='Maximum files to modify (default: 10)')
+@click.option('-m', '--model', help='Model profile to use')
+@click.option('-a', '--api', help='API config to use')
+@click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
+@click.option('--auto-context', is_flag=True, help='Include project context')
+@click.option('--preview', is_flag=True, help='Preview changes without applying')
+@click.pass_context
+def gen_feature(
+    ctx: click.Context,
+    paths: tuple,
+    description: Optional[str],
+    spec_file: Optional[str],
+    pdf: Optional[str],
+    url: Optional[str],
+    max_files: int,
+    model: Optional[str],
+    api: Optional[str],
+    interactive: bool,
+    auto_context: bool,
+    preview: bool
+) -> None:
+    """Generate code to add a feature to existing project.
+    
+    Analyzes existing code and generates changes to implement a feature.
+    
+    Examples:
+      cdc generate feature --description "Add authentication" src/
+      cdc generate feature --file feature-spec.md
+      cdc generate feature --pdf requirements.pdf --preview
+      cdc generate feature --url https://example.com/spec src/
+    """
+    console = ctx.obj['console']
+    from claude_dev_cli.input_sources import get_input_content
+    from claude_dev_cli.path_utils import expand_paths, auto_detect_files
+    
+    try:
+        # Get feature specification
+        spec_content, source_desc = get_input_content(
+            description=description,
+            file_path=spec_file,
+            pdf_path=pdf,
+            url=url,
+            console=console
+        )
+        
+        # Determine files to analyze
+        if paths:
+            files = expand_paths(list(paths), max_files=max_files)
+        else:
+            files = auto_detect_files()
+            if files:
+                console.print(f"[dim]Auto-detected {len(files)} file(s) from project[/dim]")
+        
+        if not files:
+            console.print("[yellow]No files found. Specify paths or run in a project directory.[/yellow]")
+            return
+        
+        console.print(f"[cyan]Feature specification from:[/cyan] {source_desc}")
+        console.print(f"[cyan]Analyzing:[/cyan] {len(files)} file(s)\n")
+        
+        # Show files
+        if len(files) > 1:
+            console.print(f"[bold]Files to analyze:[/bold]")
+            for f in files[:5]:
+                console.print(f"  • {f}")
+            if len(files) > 5:
+                console.print(f"  ... and {len(files) - 5} more")
+            console.print()
+        
+        # Build codebase content
+        codebase_content = ""
+        for file_path in files:
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                codebase_content += f"\n\n## File: {file_path}\n\n```\n{content}\n```\n"
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not read {file_path}: {e}[/yellow]")
+        
+        # Build prompt
+        prompt = f"Feature Specification:\n\n{spec_content}\n\n"
+        prompt += f"Existing Codebase:{codebase_content}\n\n"
+        prompt += "Analyze the existing code and provide:\n"
+        prompt += "1. Implementation plan for the feature\n"
+        prompt += "2. List of files to modify or create\n"
+        prompt += "3. Complete code changes (diffs or new files)\n"
+        prompt += "4. Any necessary setup or configuration changes\n\n"
+        prompt += "Be specific and provide complete, working code."
+        
+        # Add context if requested
+        if auto_context:
+            from claude_dev_cli.context import ContextGatherer
+            
+            with console.status("[bold blue]Gathering project context..."):
+                gatherer = ContextGatherer()
+                context = gatherer.gather_for_file(files[0], include_git=True)
+                context_info = context.format_for_prompt()
+            
+            console.print("[dim]✓ Context gathered[/dim]")
+            prompt = f"{context_info}\n\n{prompt}"
+        
+        # Generate feature implementation
+        with console.status(f"[bold blue]Analyzing codebase and generating feature implementation..."):
+            client = ClaudeClient(api_config_name=api, model=model)
+            result = client.call(prompt)
+        
+        # Show result
+        from rich.markdown import Markdown
+        md = Markdown(result)
+        console.print(md)
+        
+        if preview:
+            console.print("\n[yellow]Preview mode - no changes applied[/yellow]")
+            console.print("[dim]Remove --preview flag to apply changes[/dim]")
+            return
+        
+        # Interactive refinement
+        if interactive:
+            client = ClaudeClient(api_config_name=api, model=model)
+            conversation_context = [result]
+            
+            while True:
+                console.print("\n[dim]Ask for changes, 'apply' to confirm, or 'exit' to cancel[/dim]")
+                user_input = console.input("[cyan]You:[/cyan] ").strip()
+                
+                if user_input.lower() == 'exit':
+                    console.print("[yellow]Cancelled[/yellow]")
+                    return
+                
+                if user_input.lower() == 'apply':
+                    console.print("[green]✓[/green] Implementation plan ready")
+                    console.print("[dim]Apply the changes manually from the output above[/dim]")
+                    return
+                
+                if not user_input:
+                    continue
+                
+                # Get refinement
+                refinement_prompt = f"Previous implementation plan:\n\n{conversation_context[-1]}\n\nUser request: {user_input}\n\nProvide the updated implementation."
+                
+                console.print("\n[bold green]Claude:[/bold green] ", end='')
+                response_parts = []
+                for chunk in client.call_streaming(refinement_prompt):
+                    console.print(chunk, end='')
+                    response_parts.append(chunk)
+                console.print()
+                
+                result = ''.join(response_parts)
+                conversation_context.append(result)
+        else:
+            console.print("\n[green]✓[/green] Feature implementation generated")
+            console.print("[dim]Apply the changes manually from the output above[/dim]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
 @main.command('review')
 @click.argument('paths', nargs=-1, type=click.Path(exists=True))
 @click.option('-a', '--api', help='API config to use')
