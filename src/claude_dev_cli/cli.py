@@ -1065,12 +1065,14 @@ def gen_docs(
 @click.option('-f', '--file', 'spec_file', type=click.Path(exists=True), help='Read specification from file')
 @click.option('--pdf', type=click.Path(exists=True), help='Read specification from PDF')
 @click.option('--url', help='Fetch specification from URL')
-@click.option('-o', '--output', required=True, type=click.Path(), help='Output file path (required)')
+@click.option('-o', '--output', required=True, type=click.Path(), help='Output file or directory path (required)')
 @click.option('--language', help='Target language (auto-detected from output extension)')
 @click.option('-m', '--model', help='Model profile to use')
 @click.option('-a', '--api', help='API config to use')
 @click.option('-i', '--interactive', is_flag=True, help='Interactive refinement mode')
 @click.option('--auto-context', is_flag=True, help='Include project context')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompts')
 @click.pass_context
 def gen_code(
     ctx: click.Context,
@@ -1083,17 +1085,25 @@ def gen_code(
     model: Optional[str],
     api: Optional[str],
     interactive: bool,
-    auto_context: bool
+    auto_context: bool,
+    dry_run: bool,
+    yes: bool
 ) -> None:
     """Generate code from a specification.
     
     Reads specification from text, file, PDF, or URL and generates complete code.
     
-    Examples:
+    Single file mode (output is file):
       cdc generate code --description "REST API client" -o client.py
+      
+    Multi-file mode (output is directory):
+      cdc generate code --description "FastAPI app" -o my-api/
+      cdc generate code --file spec.md -o project/
+      
+    Examples:
       cdc generate code --file spec.md -o implementation.go
       cdc generate code --pdf requirements.pdf -o app.js
-      cdc generate code --url https://example.com/spec -o service.py
+      cdc generate code --url https://example.com/spec -o service/ --dry-run
     """
     console = ctx.obj['console']
     from claude_dev_cli.input_sources import get_input_content
@@ -1129,18 +1139,51 @@ def gen_code(
             }
             language = language_map.get(ext, ext.upper() if ext else None)
         
+        # Detect if output is directory (multi-file mode)
+        output_path = Path(output)
+        is_directory = output.endswith('/') or output_path.is_dir()
+        
         console.print(f"[cyan]Generating code from:[/cyan] {source_desc}")
         if language:
             console.print(f"[cyan]Target language:[/cyan] {language}")
-        console.print(f"[cyan]Output:[/cyan] {output}\n")
         
-        # Build prompt
-        prompt = f"Specification:\n\n{spec_content}\n\n"
-        if language:
-            prompt += f"Generate complete, production-ready {language} code that implements this specification. "
+        if is_directory:
+            console.print(f"[cyan]Output directory:[/cyan] {output}")
+            console.print(f"[cyan]Mode:[/cyan] Multi-file project generation\n")
         else:
-            prompt += "Generate complete, production-ready code that implements this specification. "
-        prompt += "Include proper error handling, documentation, and best practices."
+            console.print(f"[cyan]Output file:[/cyan] {output}\n")
+        
+        # Build prompt (different for single vs multi-file)
+        if is_directory:
+            # Multi-file mode: request structured output
+            prompt = f"Specification:\n\n{spec_content}\n\n"
+            if language:
+                prompt += f"Generate a complete, production-ready {language} project that implements this specification. "
+            else:
+                prompt += "Generate a complete, production-ready project that implements this specification. "
+            prompt += """\n
+Provide your response in this format:
+
+## File: relative/path/to/file.ext
+```language
+// Complete file content
+```
+
+## File: another/file.ext
+```language
+// Complete file content
+```
+
+Include ALL necessary files: source code, configuration, dependencies, README, etc.
+Use proper directory structure and include proper error handling, documentation, and best practices."""
+        else:
+            # Single file mode: simple prompt
+            prompt = f"Specification:\n\n{spec_content}\n\n"
+            if language:
+                prompt += f"Generate complete, production-ready {language} code that implements this specification. "
+            else:
+                prompt += "Generate complete, production-ready code that implements this specification. "
+            prompt += "Include proper error handling, documentation, and best practices."
         
         # Add context if requested
         if auto_context:
@@ -1197,8 +1240,51 @@ def gen_code(
                 conversation_context.append(result)
         
         # Save output
-        Path(output).write_text(result)
-        console.print(f"\n[green]✓[/green] Code saved to: {output}")
+        if is_directory:
+            # Multi-file mode: parse and write multiple files
+            from claude_dev_cli.multi_file_handler import MultiFileResponse
+            
+            multi_file = MultiFileResponse()
+            multi_file.parse_response(result, base_path=output_path)
+            
+            if not multi_file.files:
+                console.print("[yellow]Warning: No files were detected in the response.[/yellow]")
+                console.print("[dim]Falling back to single file output...[/dim]")
+                # Save as single file anyway
+                fallback_file = output_path / "generated_code.txt"
+                output_path.mkdir(parents=True, exist_ok=True)
+                fallback_file.write_text(result)
+                console.print(f"\n[green]✓[/green] Output saved to: {fallback_file}")
+                return
+            
+            # Validate paths
+            errors = multi_file.validate_paths(output_path)
+            if errors:
+                console.print("[red]Path validation errors:[/red]")
+                for error in errors:
+                    console.print(f"  • {error}")
+                sys.exit(1)
+            
+            # Show preview
+            multi_file.preview(console, output_path)
+            
+            # Confirm or auto-accept
+            if not yes and not dry_run:
+                if not multi_file.confirm(console):
+                    console.print("[yellow]Cancelled[/yellow]")
+                    return
+            
+            # Write files
+            multi_file.write_all(output_path, dry_run=dry_run, console=console)
+            
+            if dry_run:
+                console.print("\n[yellow]Dry-run mode - no files were written[/yellow]")
+            else:
+                console.print(f"\n[green]✓[/green] Project created in: {output}")
+        else:
+            # Single file mode: simple write
+            Path(output).write_text(result)
+            console.print(f"\n[green]✓[/green] Code saved to: {output}")
     
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
