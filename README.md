@@ -230,14 +230,20 @@ cdc review -m powerful complex_file.py  # More thorough review
 cdc generate tests -m smart mymodule.py  # Balanced approach
 ```
 
-### 3. Code Generation Commands (NEW in v0.12.0)
+### 3. Code Generation Commands (NEW in v0.12.0, enhanced v0.13.0)
 
 ```bash
-# Generate code from specification
+# Generate code from specification (single file)
 cdc generate code --description "REST API client for weather data" -o client.py
 cdc generate code --file spec.md -o implementation.go
 cdc generate code --pdf requirements.pdf -o app.js
 cdc generate code --url https://example.com/api-spec -o service.py
+
+# Generate multi-file projects (NEW in v0.13.0)
+cdc generate code --description "FastAPI REST API with auth" -o my-api/
+cdc generate code --file spec.md -o project/ --dry-run  # Preview first
+cdc generate code --file spec.md -o project/ --yes  # No confirmation
+# Creates complete directory structure with multiple files
 
 # Generate code with interactive refinement
 cdc generate code --description "Database ORM" -o orm.py --interactive
@@ -245,7 +251,7 @@ cdc generate code --description "Database ORM" -o orm.py --interactive
 # Generate code with project context
 cdc generate code --file spec.md -o service.py --auto-context
 
-# Add features to existing project
+# Add features to existing project (NEW: multi-file output in v0.13.0)
 cdc generate feature --description "Add user authentication with JWT" src/
 cdc generate feature --file feature-spec.md
 cdc generate feature --pdf product-requirements.pdf --preview
@@ -253,6 +259,8 @@ cdc generate feature --url https://example.com/feature-spec
 
 # Preview feature changes before applying
 cdc generate feature --description "Add caching layer" src/ --preview
+cdc generate feature --description "Add REST API" --dry-run  # Preview changes
+cdc generate feature --file spec.md --yes  # Apply without confirmation
 
 # Interactive feature implementation
 cdc generate feature --description "Add logging" src/ --interactive
@@ -312,10 +320,15 @@ cdc generate docs mymodule.py --auto-context
 # Refactor (single file)
 cdc refactor legacy_code.py
 
-# Refactor multiple files (NEW in v0.11.0)
+# Refactor multiple files (NEW in v0.11.0, enhanced v0.13.0)
 cdc refactor file1.py file2.py file3.py
 cdc refactor src/
 cdc refactor  # Auto-detect git changes
+
+# Multi-file refactoring with preview (NEW in v0.13.0)
+cdc refactor src/ --dry-run  # Preview changes
+cdc refactor src/ --yes  # Apply without confirmation
+cdc refactor src/ --preview  # Review before applying
 
 # Refactor with context (includes related files)
 cdc refactor legacy_code.py --auto-context

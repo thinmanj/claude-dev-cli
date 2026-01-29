@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-01-29
+
+### Added
+- **Multi-File Output System**: Commands can now generate and apply changes to multiple files
+  - New `multi_file_handler.py` module for parsing structured AI responses
+  - Support for file markers: `## File:`, `## Create:`, `## Modify:`, `## Delete:`
+  - Visual directory tree preview with Rich formatting
+  - Interactive confirmation with file content preview
+  - Path validation and security checks (no traversal, no absolute paths)
+  - Dry-run mode to preview without writing files
+  - `--dry-run` flag: Show what would change without writing
+  - `--yes` flag: Apply changes without confirmation
+  - `--preview` flag: Review changes before applying
+
+- **Enhanced `generate code` Command**:
+  - Detects directory output (path ends with `/` or is existing directory)
+  - Multi-file mode: Generates complete project structures
+  - Single-file mode: Maintains backward compatibility
+  - Examples:
+    - `cdc generate code -d "FastAPI app" -o my-api/` (generates multiple files)
+    - `cdc generate code -f spec.md -o project/ --dry-run` (preview multi-file output)
+    - `cdc generate code -f spec.md -o script.py` (single file, unchanged behavior)
+
+- **Enhanced `generate feature` Command**:
+  - Parses structured multi-file output from Claude
+  - Shows interactive tree preview of changes
+  - Applies changes to multiple files simultaneously
+  - `--dry-run`: Preview feature implementation
+  - `--yes`: Apply without confirmation
+  - Falls back to markdown display if no structured output
+  - Examples:
+    - `cdc generate feature -d "add auth" src/ --dry-run`
+    - `cdc generate feature -f spec.md --yes`
+
+- **Enhanced `refactor` Command**:
+  - Multi-file refactoring with structured output
+  - Tree preview of refactored files
+  - `--preview`, `--dry-run`, `--yes` flags
+  - Maintains backward compatibility with `-o` flag for single file
+  - Examples:
+    - `cdc refactor src/ --dry-run`
+    - `cdc refactor file.py --yes`
+
+### Enhanced
+- **Prompt Engineering**: Updated prompts request structured multi-file format
+  - Clear instructions for file markers in AI responses
+  - Language-aware code block formatting
+  - Complete file content (not diffs) for easier parsing
+
+- **Safety Features**:
+  - Path validation prevents directory traversal attacks
+  - Rejects absolute paths for security
+  - Resolves paths safely before writing
+  - Creates parent directories automatically
+
+- **User Experience**:
+  - Visual tree shows: `(new)`, `(modified)`, `(deleted)` status
+  - Summary shows counts: "2 created, 1 modified, 0 deleted"
+  - Line counts displayed for each file
+  - Interactive preview with content display
+  - Confirmation prompt with multiple options (y/n/preview/help)
+
+### Testing
+- Added 30 comprehensive tests for `multi_file_handler`
+- Tests cover: parsing, validation, tree building, file operations, dry-run, confirmation
+- All tests pass (333 total: 30 new + 303 existing)
+
+### Technical Details
+- `FileChange` dataclass: Tracks path, content, change_type, original_content, diff
+- `MultiFileResponse` class methods:
+  - `parse_response()`: Extracts file changes from AI output
+  - `validate_paths()`: Security validation
+  - `build_tree()`: Creates Rich tree visualization
+  - `preview()`: Shows tree and summary
+  - `write_all()`: Writes all changes with dry-run support
+  - `confirm()`: Interactive confirmation prompt
+- Supports multiple languages in code blocks
+- Handles whitespace variations in markers
+- Graceful fallback to single-file or markdown output
+
 ## [0.12.1] - 2026-01-29
 
 ### Fixed
