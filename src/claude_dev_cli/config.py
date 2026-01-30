@@ -186,12 +186,13 @@ class Config:
             json.dump(data, f, indent=2)
     
     def _get_default_model_profiles(self) -> List[Dict]:
-        """Get default model profiles with current Anthropic pricing."""
-        return [
+        """Get default model profiles for all providers."""
+        profiles = [
+            # Anthropic (Claude) profiles
             {
                 "name": "fast",
                 "model_id": "claude-3-5-haiku-20241022",
-                "description": "Fast and economical for simple tasks",
+                "description": "Fast and economical for simple tasks (Claude)",
                 "input_price_per_mtok": 0.80,
                 "output_price_per_mtok": 4.00,
                 "use_cases": ["quick", "simple", "classification"],
@@ -201,7 +202,7 @@ class Config:
             {
                 "name": "smart",
                 "model_id": "claude-sonnet-4-5-20250929",
-                "description": "Balanced performance and cost for most tasks",
+                "description": "Balanced performance and cost for most tasks (Claude)",
                 "input_price_per_mtok": 3.00,
                 "output_price_per_mtok": 15.00,
                 "use_cases": ["general", "coding", "analysis"],
@@ -211,14 +212,47 @@ class Config:
             {
                 "name": "powerful",
                 "model_id": "claude-opus-4-20250514",
-                "description": "Maximum capability for complex tasks",
+                "description": "Maximum capability for complex tasks (Claude)",
                 "input_price_per_mtok": 15.00,
                 "output_price_per_mtok": 75.00,
                 "use_cases": ["complex", "research", "creative"],
                 "provider": "anthropic",
                 "api_config_name": None
-            }
+            },
+            # OpenAI (GPT) profiles - only added if OpenAI provider available
+            {
+                "name": "fast-openai",
+                "model_id": "gpt-3.5-turbo",
+                "description": "Fast and economical for simple tasks (OpenAI)",
+                "input_price_per_mtok": 0.50,
+                "output_price_per_mtok": 1.50,
+                "use_cases": ["quick", "simple", "chat"],
+                "provider": "openai",
+                "api_config_name": None
+            },
+            {
+                "name": "smart-openai",
+                "model_id": "gpt-4-turbo",
+                "description": "Balanced performance and cost for most tasks (OpenAI)",
+                "input_price_per_mtok": 10.00,
+                "output_price_per_mtok": 30.00,
+                "use_cases": ["general", "coding", "analysis"],
+                "provider": "openai",
+                "api_config_name": None
+            },
+            {
+                "name": "powerful-openai",
+                "model_id": "gpt-4",
+                "description": "High capability for complex tasks (OpenAI)",
+                "input_price_per_mtok": 30.00,
+                "output_price_per_mtok": 60.00,
+                "use_cases": ["complex", "research", "reasoning"],
+                "provider": "openai",
+                "api_config_name": None
+            },
         ]
+        
+        return profiles
     
     def _auto_migrate_keys(self) -> None:
         """Automatically migrate plaintext API keys to secure storage."""

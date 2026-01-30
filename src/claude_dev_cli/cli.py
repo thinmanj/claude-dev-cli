@@ -479,30 +479,89 @@ def config() -> None:
 
 
 @config.command('add')
+@click.argument('provider', type=click.Choice(['anthropic', 'openai'], case_sensitive=False), default='anthropic')
 @click.argument('name')
-@click.option('--api-key', help='API key (or set {NAME}_ANTHROPIC_API_KEY env var)')
+@click.option('--api-key', help='API key (or set {NAME}_<PROVIDER>_API_KEY env var)')
 @click.option('--description', help='Description of this API config')
 @click.option('--default', is_flag=True, help='Set as default API config')
+@click.option('--base-url', help='Custom API base URL (for Azure, proxies, etc.)')
 @click.pass_context
 def config_add(
     ctx: click.Context,
+    provider: str,
     name: str,
     api_key: Optional[str],
     description: Optional[str],
-    default: bool
+    default: bool,
+    base_url: Optional[str]
 ) -> None:
-    """Add a new API configuration."""
+    """Add a new provider configuration.
+    
+    PROVIDER: Provider type (anthropic or openai)
+    NAME: Configuration name
+    
+    Examples:
+      cdc config add anthropic personal --default
+      cdc config add openai work-openai --api-key sk-...
+      cdc config add openai azure-openai --base-url https://...openai.azure.com
+    """
     console = ctx.obj['console']
     
     try:
+        from claude_dev_cli.providers.factory import ProviderFactory
+        
+        # Check if provider is available
+        if not ProviderFactory.is_provider_available(provider):
+            console.print(f"[red]Error: {provider} provider not available[/red]")
+            if provider == 'openai':
+                console.print("Install with: pip install 'claude-dev-cli[openai]'")
+            sys.exit(1)
+        
         config = Config()
-        config.add_api_config(
+        
+        # Get API key from environment if not provided
+        if api_key is None:
+            env_var = f"{name.upper()}_{provider.upper()}_API_KEY"
+            api_key = os.environ.get(env_var)
+            if not api_key:
+                # Try generic env var for provider
+                generic_env = f"{provider.upper()}_API_KEY"
+                api_key = os.environ.get(generic_env)
+            if not api_key:
+                raise ValueError(
+                    f"API key not provided and {env_var} environment variable not set"
+                )
+        
+        # Check if name already exists
+        api_configs = config._data.get("api_configs", [])
+        for cfg in api_configs:
+            if cfg["name"] == name:
+                raise ValueError(f"Config with name '{name}' already exists")
+        
+        # Store API key in secure storage
+        config.secure_storage.store_key(name, api_key)
+        
+        # If this is the first config or make_default is True, set as default
+        if default or not api_configs:
+            for cfg in api_configs:
+                cfg["default"] = False
+        
+        # Create provider config
+        from claude_dev_cli.config import ProviderConfig
+        provider_config = ProviderConfig(
             name=name,
-            api_key=api_key,
+            provider=provider,
+            api_key="",  # Empty string indicates key is in secure storage
+            base_url=base_url,
             description=description,
-            make_default=default
+            default=default or not api_configs
         )
-        console.print(f"[green]✓[/green] Added API config: {name}")
+        
+        api_configs.append(provider_config.model_dump())
+        config._data["api_configs"] = api_configs
+        config._save_config()
+        
+        console.print(f"[green]✓[/green] Added {provider} config: {name}")
         
         # Show storage method
         storage_method = config.secure_storage.get_storage_method()
@@ -575,7 +634,8 @@ def config_list(ctx: click.Context) -> None:
     
     for cfg in api_configs:
         default_marker = " [bold green](default)[/bold green]" if cfg.default else ""
-        console.print(f"• {cfg.name}{default_marker}")
+        provider = getattr(cfg, 'provider', 'anthropic')  # Default to anthropic for backward compatibility
+        console.print(f"• {cfg.name}{default_marker} [dim]({provider})[/dim]")
         if cfg.description:
             console.print(f"  {cfg.description}")
         console.print(f"  API Key: {cfg.api_key[:15]}...")
