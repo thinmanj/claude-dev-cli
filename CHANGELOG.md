@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-01-30
+
+### Enhanced
+- **Workflow Commands**: Extended workflow engine to support more commands
+  - Added `ask` command for AI-powered questions within workflows
+  - Added `model` parameter support for all workflow commands
+  - Improved error messages showing list of supported commands
+  - Commands now support model selection per step
+
+### New Workflow Capabilities
+- **AI Decision Making**: Use `ask` command to query AI and make workflow decisions
+  ```yaml
+  - name: check-complexity
+    command: ask
+    args:
+      prompt: "Rate complexity 1-10"
+      api: "local"
+      model: "fast-local"
+    output_var: score
+  ```
+- **Strategic Model Selection**: Specify different models for different steps
+  - Use free local models for simple tasks
+  - Use powerful cloud models only when needed
+  - Conditional execution based on AI responses
+
+### New Examples
+- **ai-decision-workflow.yaml**: Demonstrates AI-powered conditional logic
+  - Complexity scoring with AI
+  - Adaptive code review based on complexity
+  - Security checks triggered conditionally
+- **multi-model-workflow.yaml**: Demonstrates cost optimization
+  - Local (free) AI for initial scans
+  - Cloud AI only for critical issues
+  - Approval gates before paid API usage
+
+### Technical Details
+- `_execute_ask_command()`: New method for ask command execution
+- Model parameter passed through to all command functions
+- Better error reporting with supported command list
+- Placeholder for `generate code` and `generate feature` (use shell for now)
+
+### Use Cases
+```bash
+# Run AI decision workflow
+cdc workflow run ai-decision-workflow.yaml --var file=src/main.py
+
+# Cost-optimized workflow
+cdc workflow run multi-model-workflow.yaml --var target_file=app.py
+```
+
 ## [0.16.0] - 2026-01-30
 
 ### Added
