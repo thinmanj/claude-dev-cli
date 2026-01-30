@@ -121,34 +121,105 @@ brew install thinmanj/tap/claude-dev-cli
 
 ### Via pip
 
+#### Basic Installation
+
+Core dependencies only (includes unidiff for diff parsing):
+
 ```bash
-# Basic installation
 pip install claude-dev-cli
-
-# With code generation support (PDF & URL input)
-pip install claude-dev-cli[generation]
-
-# With TOON support (30-60% token reduction)
-pip install claude-dev-cli[toon]
-
-# With all optional features
-pip install claude-dev-cli[generation,toon]
 ```
+
+Core dependencies:
+- `anthropic>=0.18.0` - Claude API client
+- `click>=8.1.0` - CLI framework
+- `rich>=13.0.0` - Terminal formatting
+- `pydantic>=2.0.0` - Data validation
+- `keyring>=24.0.0` - Secure credential storage
+- `cryptography>=41.0.0` - Encryption for secure storage
+- `pyyaml>=6.0.0` - YAML configuration support
+- `unidiff>=0.7.0` - Production-grade diff parsing
+
+#### With Optional Features
+
+**Code Generation Support** (PDF & URL input):
+
+```bash
+pip install 'claude-dev-cli[generation]'
+```
+
+Adds:
+- `pypdf>=3.0.0` - PDF text extraction
+- `requests>=2.28.0` - HTTP client for URL fetching
+- `beautifulsoup4>=4.0.0` - HTML parsing
+
+**TOON Format Support** (30-60% token reduction):
+
+```bash
+pip install 'claude-dev-cli[toon]'
+```
+
+Adds:
+- `toon-format>=0.1.0` - TOON encoding/decoding
+
+**Syntax Highlighting** (enhanced diff display):
+
+```bash
+pip install 'claude-dev-cli[plugins]'
+```
+
+Adds:
+- `pygments>=2.0.0` - Syntax highlighting for diffs
+
+**All Optional Features**:
+
+```bash
+pip install 'claude-dev-cli[generation,toon,plugins]'
+```
+
+**Development Installation** (for contributors):
+
+```bash
+pip install 'claude-dev-cli[dev]'
+```
+
+Includes all optional features plus:
+- `pytest>=7.0.0` - Testing framework
+- `black>=23.0.0` - Code formatting
+- `ruff>=0.1.0` - Linting
+- `mypy>=1.0.0` - Type checking
 
 ### Via pipx (Recommended for CLI tools)
 
+pipx provides isolated installations without affecting your system Python:
+
 ```bash
-# Isolated installation
+# Basic installation
 pipx install claude-dev-cli
 
-# With code generation support
-pipx install claude-dev-cli[generation]
+# With code generation support (PDF & URL)
+pipx install 'claude-dev-cli[generation]'
 
-# With TOON support
-pipx install claude-dev-cli[toon]
+# With TOON support (token reduction)
+pipx install 'claude-dev-cli[toon]'
+
+# With syntax highlighting
+pipx install 'claude-dev-cli[plugins]'
 
 # With all optional features
-pipx install claude-dev-cli[generation,toon]
+pipx install 'claude-dev-cli[generation,toon,plugins]'
+```
+
+### Upgrade Existing Installation
+
+```bash
+# Upgrade via pip
+pip install --upgrade claude-dev-cli
+
+# Upgrade via pipx
+pipx upgrade claude-dev-cli
+
+# Upgrade via Homebrew
+brew upgrade claude-dev-cli
 ```
 
 ## Quick Start
