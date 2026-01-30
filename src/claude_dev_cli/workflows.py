@@ -130,6 +130,7 @@ class WorkflowEngine:
             generate_tests, code_review, debug_code, 
             generate_docs, refactor_code, git_commit_message
         )
+        from claude_dev_cli.core import ClaudeClient
         
         # Map commands to functions
         command_map = {
@@ -141,11 +142,23 @@ class WorkflowEngine:
             'git commit': git_commit_message,
         }
         
+        # Handle special commands that need different execution
+        if command == 'ask':
+            return self._execute_ask_command(interpolated_args)
+        elif command in ['generate code', 'generate feature']:
+            # These are CLI-only commands that would need file generation logic
+            # For now, redirect to shell equivalent
+            return StepResult(
+                success=False,
+                output="",
+                error=f"Command '{command}' not yet supported in workflows. Use shell step with 'cdc {command}' instead."
+            )
+        
         if command not in command_map:
             return StepResult(
                 success=False,
                 output="",
-                error=f"Unknown command: {command}"
+                error=f"Unknown command: {command}. Supported: {', '.join(command_map.keys())}, ask"
             )
         
         try:
@@ -159,6 +172,8 @@ class WorkflowEngine:
                 func_args['error_message'] = interpolated_args['error']
             if 'api' in interpolated_args:
                 func_args['api_config_name'] = interpolated_args['api']
+            if 'model' in interpolated_args:
+                func_args['model'] = interpolated_args['model']
             
             # Execute
             result = func(**func_args)
@@ -171,6 +186,39 @@ class WorkflowEngine:
                 success=True,
                 output=result,
                 metadata={'command': command}
+            )
+        
+        except Exception as e:
+            return StepResult(
+                success=False,
+                output="",
+                error=str(e)
+            )
+    
+    def _execute_ask_command(self, args: Dict[str, Any]) -> StepResult:
+        """Execute an ask command step."""
+        try:
+            from claude_dev_cli.core import ClaudeClient
+            
+            prompt = args.get('prompt', args.get('question', ''))
+            if not prompt:
+                return StepResult(
+                    success=False,
+                    output="",
+                    error="ask command requires 'prompt' or 'question' argument"
+                )
+            
+            api = args.get('api')
+            model = args.get('model')
+            system = args.get('system')
+            
+            client = ClaudeClient(api_config_name=api)
+            result = client.call(prompt, system_prompt=system, model=model)
+            
+            return StepResult(
+                success=True,
+                output=result,
+                metadata={'command': 'ask'}
             )
         
         except Exception as e:
