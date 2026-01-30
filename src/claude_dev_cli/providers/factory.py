@@ -5,18 +5,38 @@ from typing import Any
 from claude_dev_cli.providers.base import AIProvider, ProviderError
 from claude_dev_cli.providers.anthropic import AnthropicProvider
 
+# Try to import OpenAI provider, graceful fallback if not installed
+try:
+    from claude_dev_cli.providers.openai import OpenAIProvider
+    OPENAI_PROVIDER_AVAILABLE = True
+except (ImportError, RuntimeError):
+    OpenAIProvider = None  # type: ignore
+    OPENAI_PROVIDER_AVAILABLE = False
+
 
 class ProviderFactory:
     """Factory for creating AI provider instances based on configuration."""
     
-    # Registry of available providers
-    _PROVIDERS = {
-        "anthropic": AnthropicProvider,
+    # Build registry of available providers
+    @staticmethod
+    def _build_provider_registry() -> dict:
+        """Build registry of available providers based on installed dependencies."""
+        registry = {
+            "anthropic": AnthropicProvider,
+        }
+        
+        # Add OpenAI if available
+        if OPENAI_PROVIDER_AVAILABLE and OpenAIProvider:
+            registry["openai"] = OpenAIProvider
+        
         # Future providers:
-        # "openai": OpenAIProvider,      # v0.15.0
         # "ollama": OllamaProvider,      # v0.16.0
         # "lmstudio": LMStudioProvider,  # v0.16.0
-    }
+        
+        return registry
+    
+    # Registry of available providers
+    _PROVIDERS = None
     
     @staticmethod
     def create(config: Any) -> AIProvider:
@@ -32,6 +52,10 @@ class ProviderFactory:
         Raises:
             ProviderError: If provider type is unknown or unavailable
         """
+        # Build registry if not already done
+        if ProviderFactory._PROVIDERS is None:
+            ProviderFactory._PROVIDERS = ProviderFactory._build_provider_registry()
+        
         # Determine provider type
         provider_type = getattr(config, 'provider', 'anthropic')
         
@@ -60,6 +84,8 @@ class ProviderFactory:
         Returns:
             List of provider type names (e.g., ['anthropic', 'openai'])
         """
+        if ProviderFactory._PROVIDERS is None:
+            ProviderFactory._PROVIDERS = ProviderFactory._build_provider_registry()
         return list(ProviderFactory._PROVIDERS.keys())
     
     @staticmethod
@@ -72,4 +98,6 @@ class ProviderFactory:
         Returns:
             True if provider is available, False otherwise
         """
+        if ProviderFactory._PROVIDERS is None:
+            ProviderFactory._PROVIDERS = ProviderFactory._build_provider_registry()
         return provider_type.lower() in ProviderFactory._PROVIDERS
