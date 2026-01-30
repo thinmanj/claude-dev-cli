@@ -114,6 +114,17 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 - **Project Memory**: Remember preferences per project
 - **Global Config**: Set context defaults in `~/.claude-dev-cli/config.json`
 
+### 🔄 Workflows (v0.7.0+, Enhanced v0.16.1)
+- **Multi-Step Automation**: Chain AI operations and shell commands with YAML
+- **AI Decision Making**: Use `ask` command to make intelligent workflow decisions (v0.16.1)
+- **Variable Interpolation**: Pass data between steps with `{{variable}}` syntax
+- **Conditional Execution**: Skip steps based on conditions with `if` clauses
+- **Approval Gates**: Human-in-the-loop with `approval_required: true`
+- **Model Selection**: Use different AI models per step for cost optimization (v0.16.1)
+- **Error Handling**: Continue on failure with `continue_on_error: true`
+- **Three Step Types**: command (cdc), shell (bash/zsh), set (variables)
+- **Cost Optimization**: Mix free local AI with paid cloud AI strategically
+
 ### 🎒 TOON Format Support (Optional)
 - **Token Reduction**: 30-60% fewer tokens than JSON
 - **Cost Savings**: Reduce API costs significantly
@@ -709,7 +720,208 @@ cdc history delete 20240109_143022
 - Reduces API costs by ~30-50% in long conversations
 - Shows token savings after summarization
 
-### 7. Usage Tracking
+### 7. Workflows - AI-Powered Automation (v0.7.0+, Enhanced v0.16.1)
+
+Chain multiple AI operations into automated sequences with YAML workflows.
+
+#### Basic Workflow Usage
+
+```bash
+# Run a workflow
+cdc workflow run my-workflow.yaml
+
+# Pass variables
+cdc workflow run workflow.yaml --var file=main.py --var api=local
+
+# List available workflows
+cdc workflow list
+
+# Show workflow details
+cdc workflow show workflow.yaml
+```
+
+#### Example: Simple Review & Test Workflow
+
+```yaml
+name: "Review and Test"
+description: "Review code and generate tests"
+
+steps:
+  - name: code-review
+    command: review
+    args:
+      file: "{{target_file}}"
+      api: "local"  # Use FREE local AI
+      model: "smart-local"
+    output_var: review_result
+  
+  - name: generate-tests
+    command: generate tests
+    args:
+      file: "{{target_file}}"
+      api: "local"
+      model: "code-local"
+    output_var: tests
+  
+  - name: run-tests
+    shell: "pytest tests/"
+    continue_on_error: true
+```
+
+**Run it:**
+```bash
+cdc workflow run review-test.yaml --var target_file=app.py
+```
+
+#### Example: AI Decision Making (NEW in v0.16.1)
+
+Use the `ask` command to make intelligent workflow decisions:
+
+```yaml
+name: "Adaptive Code Analysis"
+description: "AI analyzes code complexity and adapts workflow"
+
+steps:
+  # AI rates complexity
+  - name: check-complexity
+    command: ask
+    args:
+      prompt: "Rate this code complexity 1-10, respond with number only: {{code}}"
+      api: "local"  # FREE
+      model: "fast-local"
+    output_var: complexity
+  
+  # Conditional deep review for complex code
+  - name: deep-review
+    command: review
+    args:
+      file: "{{file}}"
+      api: "personal"  # Use paid API for complex code
+      model: "powerful"
+    if: "{{complexity}} > 7"
+    approval_required: true  # Ask before using paid API
+  
+  # Simple refactor for medium complexity
+  - name: simple-refactor
+    command: refactor
+    args:
+      file: "{{file}}"
+      api: "local"  # FREE
+    if: "{{complexity}} >= 5 and {{complexity}} <= 7"
+```
+
+**Key Features:**
+- ✨ `ask` command for AI queries
+- 💰 Mix free local and paid cloud AI
+- 🎯 Conditional execution based on AI responses  
+- ✋ Approval gates before expensive operations
+
+#### Example: Cost-Optimized Workflow
+
+```yaml
+name: "Smart Cost Optimization"
+description: "Use local AI first, cloud only when critical"
+
+steps:
+  # Quick scan with FREE local AI
+  - name: quick-scan
+    command: ask
+    args:
+      prompt: "Quick scan for obvious issues: {{code}}"
+      api: "local"  # FREE
+      model: "fast-local"
+    output_var: issues
+  
+  # Only use expensive cloud AI if critical issues found
+  - name: deep-security-analysis
+    command: ask
+    args:
+      prompt: "Deep security analysis: {{code}}"
+      api: "personal"  # PAID
+      model: "powerful"  # Claude Opus - expensive
+      system: "You are a security expert"
+    if: "{{issues}} contains 'critical' or {{issues}} contains 'security'"
+    approval_required: true
+  
+  # Tests with local code-specialized model (FREE)
+  - name: generate-tests
+    command: generate tests
+    args:
+      file: "{{file}}"
+      api: "local"  # FREE
+      model: "code-local"
+```
+
+**Cost Savings:**
+- Local AI for initial scans: $0
+- Cloud AI only when needed: saves 70-90%
+- Approval gates prevent accidental costs
+
+#### Workflow Step Types
+
+**1. Command Steps (cdc commands)**
+```yaml
+- name: review-code
+  command: review  # or: generate tests, debug, refactor, etc.
+  args:
+    file: "{{file}}"
+    api: "local"
+    model: "smart-local"
+  output_var: result
+```
+
+**Supported commands:** `review`, `generate tests`, `generate docs`, `refactor`, `debug`, `git commit`, `ask` (v0.16.1)
+
+**2. Shell Steps (any command)**
+```yaml
+- name: run-tests
+  shell: "pytest tests/ -v"
+  output_var: test_output
+  continue_on_error: true
+```
+
+**3. Set Steps (variables)**
+```yaml
+- name: set-config
+  set: api_endpoint
+  value: "https://api.example.com"
+```
+
+#### Advanced Features
+
+**Conditional Execution:**
+```yaml
+if: "{{score}} > 7"  # Simple comparison
+if: "{{result}} contains 'error'"  # String matching
+if: "{{tests.success}}"  # Access step results
+```
+
+**Approval Gates:**
+```yaml
+approval_required: true  # Pause for user confirmation
+```
+
+**Error Handling:**
+```yaml
+continue_on_error: true  # Don't stop workflow on failure
+```
+
+**Variable Interpolation:**
+```yaml
+{{variable}}  # Simple variable
+{{step_name.output}}  # Step output
+{{step_name.success}}  # Step success status
+```
+
+#### Example Workflows Included
+
+**Location:** `examples/workflows/`
+
+1. **review-and-refactor.yaml** - Basic review workflow
+2. **ai-decision-workflow.yaml** - AI-powered decisions (v0.16.1)
+3. **multi-model-workflow.yaml** - Cost optimization (v0.16.1)
+
+### 8. Usage Tracking
 
 ```bash
 # View all usage
@@ -722,7 +934,7 @@ cdc usage --days 7
 cdc usage --api client
 ```
 
-### 7. TOON Format (Optional - Reduces Tokens by 30-60%)
+### 9. TOON Format (Optional - Reduces Tokens by 30-60%)
 
 ```bash
 # Check if TOON is installed
@@ -891,6 +1103,31 @@ When using a client's Enterprise API:
 |---------|-------------|
 | `cdc git commit` | Generate commit message |
 
+### Workflows (v0.7.0+)
+
+| Command | Description |
+|---------|-------------|
+| `cdc workflow run <file>` | Execute workflow from YAML |
+| `cdc workflow list` | List available workflows |
+| `cdc workflow show <file>` | Show workflow details |
+
+### Ollama (Local AI) (v0.16.0+)
+
+| Command | Description |
+|---------|-------------|
+| `cdc ollama list` | List local models |
+| `cdc ollama pull <model>` | Download model |
+| `cdc ollama show <model>` | Show model details |
+
+### Model Profiles (v0.10.0+)
+
+| Command | Description |
+|---------|-------------|
+| `cdc model list` | List all model profiles |
+| `cdc model show <name>` | Show profile details |
+| `cdc model add <name> <model_id>` | Add custom profile |
+| `cdc model set-default <name>` | Set default profile |
+
 ## Options
 
 ### Common Options
@@ -901,11 +1138,33 @@ When using a client's Enterprise API:
 - `-f, --file <path>`: Include file in prompt
 - `-o, --output <path>`: Save output to file
 
-### Models
+### Model Profiles
 
-- `claude-3-5-sonnet-20241022` (default)
-- `claude-3-opus-20240229`
-- `claude-3-haiku-20240307`
+**Anthropic (Claude):**
+- `fast` / `claude-3-5-haiku-20241022` - Fast & economical ($0.80/$4 per Mtok)
+- `smart` / `claude-sonnet-4-5-20250929` - Balanced (default) ($3/$15 per Mtok)
+- `powerful` / `claude-opus-4-20250514` - Most capable ($15/$75 per Mtok)
+
+**OpenAI (GPT):** (requires `pip install 'claude-dev-cli[openai]'`)
+- `fast-openai` / `gpt-3.5-turbo` - Fast & cheap ($0.50/$1.50 per Mtok)
+- `smart-openai` / `gpt-4-turbo` - Balanced ($10/$30 per Mtok)
+- `powerful-openai` / `gpt-4` - High capability ($30/$60 per Mtok)
+
+**Ollama (Local - FREE):** (requires `pip install 'claude-dev-cli[ollama]'`)
+- `fast-local` / `mistral` - Fast inference (8k context, FREE)
+- `smart-local` / `mixtral` - Powerful reasoning (32k context, FREE)
+- `code-local` / `codellama` - Code specialist (16k context, FREE)
+
+**Usage:**
+```bash
+# Use model profile
+cdc ask -m fast "quick question"  # Uses Haiku
+cdc ask -m fast-local "question"  # Uses Mistral (FREE)
+
+# Use specific model ID
+cdc ask -m claude-opus-4-20250514 "complex task"
+cdc ask -m gpt-4-turbo "openai task"
+```
 
 ## Examples
 
