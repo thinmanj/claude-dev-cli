@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-01-30
+
+### Documentation
+- **Comprehensive README Update**: Major documentation overhaul (265 lines added)
+  - Added complete Workflows section with 200+ lines of documentation
+  - Documented all three AI providers (Anthropic, OpenAI, Ollama)
+  - Added workflow examples (basic, AI decision-making, cost-optimized)
+  - Expanded Command Reference with all new commands
+  - Updated Models section with all provider models and pricing
+  - Added strategic cost optimization examples
+
+### Workflows Documentation
+- Basic workflow usage and syntax
+- AI decision-making workflows (v0.16.1 features)
+- Cost optimization strategies
+- Step types (command, shell, set)
+- Advanced features (conditionals, approval gates, error handling)
+- Variable interpolation guide
+- Three example workflows included
+
+### Multi-Provider Documentation
+- Anthropic (Claude) models with pricing
+- OpenAI (GPT) models with pricing
+- Ollama (Local) models - all FREE
+- Setup guides for each provider
+- Model profile usage examples
+
+### Command Reference Additions
+- Workflow commands (run, list, show)
+- Ollama commands (list, pull, show)
+- Model profile commands (list, show, add, set-default)
+
 ## [0.16.1] - 2026-01-30
 
 ### Enhanced
