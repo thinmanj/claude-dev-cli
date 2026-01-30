@@ -117,7 +117,7 @@ def project_dir(tmp_path: Path, sample_project_profile: Dict[str, Any]) -> Path:
 
 @pytest.fixture
 def mock_anthropic_client() -> Mock:
-    """Mock Anthropic client for testing."""
+    """Mock Anthropic client for testing (legacy fixture)."""
     mock_client = Mock()
     
     # Mock non-streaming response
@@ -134,6 +134,47 @@ def mock_anthropic_client() -> Mock:
     mock_client.messages.stream.return_value = mock_stream
     
     return mock_client
+
+
+@pytest.fixture(autouse=True)
+def mock_provider_factory(monkeypatch):
+    """Auto-mock ProviderFactory for all tests."""
+    from datetime import datetime
+    from unittest.mock import Mock
+    from claude_dev_cli.providers.base import UsageInfo
+    
+    mock_provider = Mock()
+    mock_provider.provider_name = "anthropic"
+    
+    # Mock call method
+    mock_provider.call.return_value = "Test response"
+    
+    # Mock streaming method
+    def mock_streaming(*args, **kwargs):
+        yield from ["Test ", "streaming ", "response"]
+    mock_provider.call_streaming = mock_streaming
+    
+    # Mock usage info
+    mock_usage = UsageInfo(
+        input_tokens=100,
+        output_tokens=200,
+        duration_ms=1500,
+        model="claude-sonnet-4-5-20250929",
+        timestamp=datetime.utcnow(),
+        cost_usd=0.00075
+    )
+    mock_provider.get_last_usage.return_value = mock_usage
+    
+    # Mock test_connection
+    mock_provider.test_connection.return_value = True
+    
+    # Patch the factory
+    def mock_create(config):
+        return mock_provider
+    
+    monkeypatch.setattr("claude_dev_cli.providers.factory.ProviderFactory.create", mock_create)
+    
+    return mock_provider
 
 
 @pytest.fixture

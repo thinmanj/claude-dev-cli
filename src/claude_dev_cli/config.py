@@ -31,25 +31,43 @@ class SummarizationConfig(BaseModel):
 
 
 class APIConfig(BaseModel):
-    """Configuration for a Claude API key."""
+    """Configuration for a Claude API key.
+    
+    DEPRECATED: Use ProviderConfig instead. Maintained for backward compatibility.
+    """
     
     name: str
     api_key: str
     description: Optional[str] = None
     default: bool = False
     default_model_profile: Optional[str] = None  # Default model profile for this API
+    # Added for provider compatibility
+    provider: str = "anthropic"  # Always anthropic for APIConfig
+
+
+class ProviderConfig(BaseModel):
+    """Configuration for an AI provider (Anthropic, OpenAI, Ollama, etc.)."""
+    
+    name: str  # User-friendly name (e.g., "personal-claude", "work-openai")
+    provider: str  # Provider type: "anthropic", "openai", "ollama", "lmstudio"
+    api_key: Optional[str] = None  # Not needed for local providers
+    base_url: Optional[str] = None  # Custom endpoint URL (for local/enterprise)
+    description: Optional[str] = None
+    default: bool = False
+    default_model_profile: Optional[str] = None
 
 
 class ModelProfile(BaseModel):
     """Model profile with pricing information."""
     
     name: str  # User-friendly alias (e.g., "fast", "smart", "powerful")
-    model_id: str  # Actual Claude model ID
+    model_id: str  # Provider-specific model ID
     description: Optional[str] = None
     input_price_per_mtok: float  # Input cost per million tokens (USD)
     output_price_per_mtok: float  # Output cost per million tokens (USD)
     use_cases: List[str] = Field(default_factory=list)  # Task types
-    api_config_name: Optional[str] = None  # Tied to specific API config, or None for global
+    provider: str = "anthropic"  # Provider type: "anthropic", "openai", "ollama"
+    api_config_name: Optional[str] = None  # Tied to specific API/provider config, or None for global
 
 
 class ProjectProfile(BaseModel):
@@ -177,6 +195,7 @@ class Config:
                 "input_price_per_mtok": 0.80,
                 "output_price_per_mtok": 4.00,
                 "use_cases": ["quick", "simple", "classification"],
+                "provider": "anthropic",
                 "api_config_name": None
             },
             {
@@ -186,6 +205,7 @@ class Config:
                 "input_price_per_mtok": 3.00,
                 "output_price_per_mtok": 15.00,
                 "use_cases": ["general", "coding", "analysis"],
+                "provider": "anthropic",
                 "api_config_name": None
             },
             {
@@ -195,6 +215,7 @@ class Config:
                 "input_price_per_mtok": 15.00,
                 "output_price_per_mtok": 75.00,
                 "use_cases": ["complex", "research", "creative"],
+                "provider": "anthropic",
                 "api_config_name": None
             }
         ]

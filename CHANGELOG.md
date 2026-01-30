@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-01-30
+
+### Architecture
+- **Multi-Provider Support Foundation**: Introduced provider abstraction layer
+  - Created `AIProvider` abstract base class for AI provider implementations
+  - Implemented provider factory pattern for extensible provider support
+  - Refactored `ClaudeClient` to use provider system while maintaining backward compatibility
+  - Prepared architecture for OpenAI (v0.15.0), Ollama (v0.16.0), and LM Studio support
+
+### New Components
+- **Provider System** (`src/claude_dev_cli/providers/`):
+  - `base.py`: Abstract `AIProvider` interface with standardized methods
+  - `anthropic.py`: Anthropic/Claude provider implementation
+  - `factory.py`: Provider factory for instantiating providers based on configuration
+  - Exception classes: `ProviderError`, `InsufficientCreditsError`, `ProviderConnectionError`, `ModelNotFoundError`
+
+### Configuration
+- **New Config Classes**:
+  - `ProviderConfig`: Unified configuration for all AI providers
+    - Supports `provider` field ("anthropic", "openai", "ollama", "lmstudio")
+    - Optional `base_url` for custom endpoints
+    - Optional `api_key` (not needed for local providers)
+  - `APIConfig`: Marked as deprecated but maintained for backward compatibility
+    - Automatically treated as Anthropic provider
+    - All existing configurations continue to work
+  - `ModelProfile`: Updated with `provider` field to support cross-provider models
+
+### Enhanced
+- **Usage Logging**: Now includes provider name and cost tracking
+  - `provider` field added to usage logs
+  - `cost_usd` calculated and logged per API call
+  - Better cost attribution across different providers
+
+### Backward Compatibility
+- **Zero Breaking Changes**: All existing functionality preserved
+  - `ClaudeClient` works exactly as before
+  - Existing `api_configs` treated as Anthropic providers
+  - All tests passing (58 core tests)
+  - Existing commands unchanged
+
+### Technical Details
+- `AIProvider` interface methods:
+  - `call()`: Synchronous API calls
+  - `call_streaming()`: Streaming responses
+  - `list_models()`: Model discovery
+  - `get_last_usage()`: Usage tracking
+  - `test_connection()`: Connection validation
+- `ModelInfo` and `UsageInfo` dataclasses for structured data
+- Provider factory automatically selects correct implementation
+- AnthropicProvider includes robust error handling with specific exceptions
+
+### Testing
+- Updated test infrastructure to use provider mocks
+- Added `mock_provider_factory` autouse fixture
+- All 58 core tests passing
+- Mock providers return structured `UsageInfo` for testing
+
+### Roadmap
+- **v0.15.0**: OpenAI provider (GPT-4, GPT-3.5)
+- **v0.16.0**: Local model support (Ollama, LM Studio)
+- **v0.17.0**: Fallback logic and cost optimization
+- **v2.0.0**: Potential rebrand to `ai-dev-cli`
+
 ## [0.13.3] - 2026-01-29
 
 ### Enhanced

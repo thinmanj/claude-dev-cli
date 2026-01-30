@@ -3,17 +3,22 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-from anthropic import Anthropic
+from typing import Optional, Dict, Any, List, Union
 
-from claude_dev_cli.config import Config
+from claude_dev_cli.config import Config, APIConfig, ProviderConfig
+from claude_dev_cli.providers.factory import ProviderFactory
+from claude_dev_cli.providers.base import AIProvider
 
 
 class ClaudeClient:
-    """Claude API client with multi-key routing and usage tracking."""
+    """AI client with multi-provider support and routing.
+    
+    Backward compatible wrapper around provider system.
+    Uses AIProvider abstraction to support Anthropic, OpenAI, Ollama, etc.
+    """
     
     def __init__(self, config: Optional[Config] = None, api_config_name: Optional[str] = None):
-        """Initialize Claude client.
+        """Initialize AI client.
         
         API routing hierarchy (highest to lowest priority):
         1. Explicit api_config_name parameter
@@ -35,7 +40,10 @@ class ClaudeClient:
                 "No API configuration found. Run 'cdc config add' to set up an API key."
             )
         
-        self.client = Anthropic(api_key=self.api_config.api_key)
+        # Create provider using factory pattern
+        # APIConfig is treated as ProviderConfig with provider="anthropic"
+        self.provider = ProviderFactory.create(self.api_config)
+        
         self.model = self.config.get_model()
         self.max_tokens = self.config.get_max_tokens()
     
@@ -86,7 +94,7 @@ class ClaudeClient:
         temperature: float = 1.0,
         stream: bool = False
     ) -> str:
-        """Make a call to Claude API.
+        """Make a call to AI provider.
         
         Args:
             model: Model ID or profile name (e.g., 'fast', 'smart', 'powerful')
@@ -100,34 +108,25 @@ class ClaudeClient:
         if project_profile and project_profile.system_prompt and not system_prompt:
             system_prompt = project_profile.system_prompt
         
-        kwargs: Dict[str, Any] = {
-            "model": resolved_model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        
-        if system_prompt:
-            kwargs["system"] = system_prompt
-        
-        start_time = datetime.utcnow()
-        response = self.client.messages.create(**kwargs)
-        end_time = datetime.utcnow()
-        
-        # Log usage
-        self._log_usage(
+        # Call provider
+        response = self.provider.call(
             prompt=prompt,
-            response=response,
+            system_prompt=system_prompt,
             model=resolved_model,
-            duration_ms=int((end_time - start_time).total_seconds() * 1000),
-            api_config_name=self.api_config.name
+            max_tokens=max_tokens,
+            temperature=temperature
         )
         
-        # Extract text from response
-        text_blocks = [
-            block.text for block in response.content if hasattr(block, 'text')
-        ]
-        return '\n'.join(text_blocks)
+        # Log usage
+        usage = self.provider.get_last_usage()
+        if usage:
+            self._log_usage(
+                prompt=prompt,
+                usage=usage,
+                api_config_name=self.api_config.name
+            )
+        
+        return response
     
     def call_streaming(
         self,
@@ -137,7 +136,7 @@ class ClaudeClient:
         max_tokens: Optional[int] = None,
         temperature: float = 1.0
     ):
-        """Make a streaming call to Claude API.
+        """Make a streaming call to AI provider.
         
         Args:
             model: Model ID or profile name (e.g., 'fast', 'smart', 'powerful')
@@ -151,37 +150,33 @@ class ClaudeClient:
         if project_profile and project_profile.system_prompt and not system_prompt:
             system_prompt = project_profile.system_prompt
         
-        kwargs: Dict[str, Any] = {
-            "model": resolved_model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        
-        if system_prompt:
-            kwargs["system"] = system_prompt
-        
-        with self.client.messages.stream(**kwargs) as stream:
-            for text in stream.text_stream:
-                yield text
+        # Use provider's streaming method
+        for text in self.provider.call_streaming(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model=resolved_model,
+            max_tokens=max_tokens,
+            temperature=temperature
+        ):
+            yield text
     
     def _log_usage(
         self,
         prompt: str,
-        response: Any,
-        model: str,
-        duration_ms: int,
+        usage: Any,  # UsageInfo from provider
         api_config_name: str
     ) -> None:
         """Log API usage to file."""
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": usage.timestamp.isoformat(),
             "api_config": api_config_name,
-            "model": model,
+            "model": usage.model,
             "prompt_preview": prompt[:100],
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-            "duration_ms": duration_ms,
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "duration_ms": usage.duration_ms,
+            "cost_usd": usage.cost_usd,
+            "provider": self.provider.provider_name
         }
         
         with open(self.config.usage_log, 'a') as f:
