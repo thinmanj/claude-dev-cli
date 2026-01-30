@@ -1,0 +1,81 @@
+name: "AI-Powered Decision Workflow"
+description: "Use AI to make decisions about code quality and apply actions conditionally"
+
+steps:
+  # Step 1: Load code file
+  - name: set-target
+    set: target_file
+    value: "{{file}}"
+  
+  # Step 2: Read file content
+  - name: read-code
+    shell: "cat {{target_file}}"
+    output_var: code_content
+  
+  # Step 3: Ask AI about code complexity
+  - name: check-complexity
+    command: ask
+    args:
+      prompt: "Rate the complexity of this code on a scale of 1-10 and respond ONLY with the number:\n\n{{code_content}}"
+      api: "local"
+      model: "fast-local"
+    output_var: complexity_score
+  
+  # Step 4: Show complexity
+  - name: show-complexity
+    shell: "echo 'Complexity score: {{complexity_score}}'"
+  
+  # Step 5: Ask about security (only if complex)
+  - name: security-check
+    command: ask
+    args:
+      prompt: "Analyze this code for security vulnerabilities. List any issues found:\n\n{{code_content}}"
+      api: "local"
+      model: "smart-local"
+      system: "You are a security expert. Be thorough but concise."
+    output_var: security_analysis
+    if: "{{complexity_score}} > 5"
+  
+  # Step 6: Review code if complexity is high
+  - name: detailed-review
+    command: review
+    args:
+      file: "{{target_file}}"
+      api: "local"
+      model: "smart-local"
+    output_var: review_result
+    if: "{{complexity_score}} > 7"
+  
+  # Step 7: Simple refactor if complexity is medium
+  - name: simple-refactor
+    command: refactor
+    args:
+      file: "{{target_file}}"
+      api: "local"
+    if: "{{complexity_score}} >= 5 and {{complexity_score}} <= 7"
+    approval_required: true
+  
+  # Step 8: Generate tests (always)
+  - name: generate-tests
+    command: generate tests
+    args:
+      file: "{{target_file}}"
+      api: "local"
+      model: "code-local"
+    output_var: test_code
+  
+  # Step 9: Ask AI to validate the tests
+  - name: validate-tests
+    command: ask
+    args:
+      prompt: "Are these tests comprehensive? Answer YES or NO:\n\n{{test_code}}"
+      api: "local"
+    output_var: tests_ok
+  
+  # Step 10: Show summary
+  - name: summary
+    shell: |
+      echo "=== Workflow Summary ==="
+      echo "Complexity: {{complexity_score}}/10"
+      echo "Security check: {{security_analysis}}"
+      echo "Tests validated: {{tests_ok}}"

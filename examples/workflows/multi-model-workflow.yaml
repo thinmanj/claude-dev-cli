@@ -1,0 +1,70 @@
+name: "Multi-Model Workflow"
+description: "Use different AI models optimally: local for cheap tasks, cloud for complex ones"
+
+steps:
+  # Quick local scan first (FREE)
+  - name: quick-scan
+    command: ask
+    args:
+      prompt: "Quickly scan this file and list any obvious issues. Be brief:\n\n{{code}}"
+      api: "local"
+      model: "fast-local"
+    output_var: quick_issues
+  
+  # Check if issues were found
+  - name: show-quick-scan
+    shell: "echo 'Quick scan found: {{quick_issues}}'"
+  
+  # Use local code-specialized model for test generation (FREE)
+  - name: local-test-generation
+    command: generate tests
+    args:
+      file: "{{target_file}}"
+      api: "local"
+      model: "code-local"
+    output_var: local_tests
+  
+  # Use local smart model for documentation (FREE)
+  - name: local-docs
+    command: generate docs
+    args:
+      file: "{{target_file}}"
+      api: "local"
+      model: "smart-local"
+    output_var: docs
+  
+  # If quick scan found critical issues, use cloud AI for deep analysis
+  - name: cloud-deep-review
+    command: ask
+    args:
+      prompt: "Perform deep security and performance analysis on:\n\n{{code}}"
+      api: "personal"
+      model: "powerful"  # Use Claude Opus for critical analysis
+      system: "You are a senior security and performance expert."
+    output_var: deep_analysis
+    if: "{{quick_issues}} contains 'critical' or {{quick_issues}} contains 'security'"
+    approval_required: true  # Approval before using paid API
+  
+  # Use mid-tier cloud model for refactoring suggestions
+  - name: cloud-refactor
+    command: refactor
+    args:
+      file: "{{target_file}}"
+      api: "personal"
+      model: "smart"  # Claude Sonnet - balanced
+    if: "{{quick_issues}} contains 'refactor'"
+    approval_required: true
+  
+  # Final summary using cheap local model (FREE)
+  - name: summarize
+    command: ask
+    args:
+      prompt: |
+        Summarize this workflow execution:
+        - Quick scan: {{quick_issues}}
+        - Tests generated: {{local_tests}}
+        - Documentation: {{docs}}
+        - Deep analysis: {{deep_analysis}}
+      api: "local"
+      model: "fast-local"
+    output_var: summary
