@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-01-30
+
+### Added
+- **OpenAI Provider**: Full support for GPT-4 and GPT-3.5 models
+  - GPT-4 Turbo: Latest model with 128k context
+  - GPT-4: Standard GPT-4 with 8k context
+  - GPT-3.5 Turbo: Fast and economical option
+  - Install with: `pip install 'claude-dev-cli[openai]'`
+
+### Model Profiles
+- **OpenAI Profiles**: Added 3 model profiles for OpenAI
+  - `fast-openai`: gpt-3.5-turbo ($0.50/$1.50 per Mtok)
+  - `smart-openai`: gpt-4-turbo ($10/$30 per Mtok)
+  - `powerful-openai`: gpt-4 ($30/$60 per Mtok)
+- All profiles show provider in description for clarity
+
+### CLI Enhancements
+- **Multi-Provider Config**: Enhanced `cdc config add` command
+  - New PROVIDER argument: `cdc config add <provider> <name>`
+  - Supported providers: `anthropic`, `openai`
+  - `--base-url` option for Azure OpenAI and custom endpoints
+  - Smart environment variable resolution
+  - Provider availability checking with install hints
+- **Provider Display**: Updated `cdc config list`
+  - Shows provider type next to each configuration
+  - Example: `• work-openai (openai)`
+
+### Usage Examples
+```bash
+# Add OpenAI configuration
+export OPENAI_API_KEY="sk-..."
+cdc config add openai work-openai --default
+
+# Use OpenAI for tasks
+cdc ask -a work-openai "explain asyncio"
+cdc generate code -a work-openai -d "REST API" -o app/
+
+# Use specific model profiles
+cdc ask -a work-openai -m fast-openai "quick question"
+cdc generate tests -a work-openai -m smart-openai
+
+# Azure OpenAI
+cdc config add openai azure --base-url https://your-resource.openai.azure.com
+```
+
+### Technical Details
+- **Provider Implementation**: Complete OpenAIProvider class (268 lines)
+  - Full chat completions API support
+  - Streaming responses
+  - Comprehensive error handling (auth, rate limits, quotas)
+  - Cost tracking with current OpenAI pricing
+  - Custom base_url support
+- **Dynamic Registry**: Provider factory auto-detects installed packages
+- **Graceful Fallback**: Works without openai package installed
+- **Error Mapping**: OpenAI errors mapped to provider exceptions
+  - AuthenticationError → ProviderConnectionError
+  - RateLimitError → ProviderError
+  - Quota errors → InsufficientCreditsError
+  - NotFoundError → ModelNotFoundError
+
+### Dependencies
+- Added `openai>=1.0.0` as optional dependency
+- New install options:
+  - `pip install 'claude-dev-cli[openai]'` - OpenAI support
+  - `pip install 'claude-dev-cli[all-providers]'` - All providers
+
+### Backward Compatibility
+- All existing configurations work unchanged
+- Anthropic remains default provider
+- No breaking changes to CLI or API
+- All 41 tests passing
+
+### Provider Comparison
+| Feature | Anthropic (Claude) | OpenAI (GPT) |
+|---------|-------------------|---------------|
+| Fast Model | Haiku ($0.80/$4) | GPT-3.5 ($0.50/$1.50) |
+| Smart Model | Sonnet ($3/$15) | GPT-4 Turbo ($10/$30) |
+| Powerful Model | Opus ($15/$75) | GPT-4 ($30/$60) |
+| Context | 200k tokens | 8k-128k tokens |
+| Streaming | ✓ | ✓ |
+| Vision | ✓ | ✓ |
+
 ## [0.14.0] - 2026-01-30
 
 ### Architecture
