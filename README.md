@@ -11,9 +11,25 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 
 ## Features
 
+### 🌐 Multi-Provider AI Support (v0.14.0+)
+- **Anthropic (Claude)**: GPT-4 class models with 200k context
+  - Haiku, Sonnet, Opus - full model family
+  - Industry-leading context window
+- **OpenAI (GPT)**: ChatGPT and GPT-4 models (v0.15.0+)
+  - GPT-3.5 Turbo, GPT-4, GPT-4 Turbo
+  - Azure OpenAI support
+  - Install: `pip install 'claude-dev-cli[openai]'`
+- **Ollama (Local)**: Zero-cost local inference (v0.16.0+)
+  - Mistral, Mixtral, Code Llama, DeepSeek Coder
+  - 100% free, private, offline
+  - Install: `pip install 'claude-dev-cli[ollama]'`
+- **Provider Abstraction**: Unified interface across all providers
+- **Cost Tracking**: Per-provider usage and cost monitoring
+- **Graceful Fallback**: Works with any combination of providers
+
 ### 🔑 Multi-API Key Management
 - **Secure Storage**: API keys stored in system keyring (macOS Keychain, Linux Secret Service, Windows Credential Locker)
-- Route tasks to different Claude API keys (personal, client, enterprise)
+- Route tasks to different API keys/providers (personal, client, enterprise, local)
 - Automatic API selection based on project configuration
 - Automatic migration from plaintext to secure storage
 
@@ -141,6 +157,19 @@ Core dependencies:
 
 #### With Optional Features
 
+**Multi-Provider Support**:
+
+```bash
+# OpenAI (GPT) support
+pip install 'claude-dev-cli[openai]'
+
+# Ollama (local/free) support
+pip install 'claude-dev-cli[ollama]'
+
+# All providers
+pip install 'claude-dev-cli[all-providers]'
+```
+
 **Code Generation Support** (PDF & URL input):
 
 ```bash
@@ -242,6 +271,78 @@ cdc config list
 # Manually migrate existing keys (automatic on first run)
 cdc config migrate-keys
 ```
+
+### 1.1 Setup Ollama (Local/Free Alternative) - v0.16.0+
+
+Run AI models locally with **zero cost** and full privacy using Ollama:
+
+```bash
+# Install Ollama (one-time setup)
+# macOS/Linux: Download from https://ollama.ai
+# Or via Homebrew: brew install ollama
+
+# Start Ollama server
+ollama serve  # Run in background or separate terminal
+
+# Install Ollama support
+pip install 'claude-dev-cli[ollama]'
+
+# Configure local provider (no API key needed!)
+cdc config add ollama local --default
+# ℹ️  No API key needed for local provider
+
+# Pull models (one-time per model)
+cdc ollama pull mistral      # Fast, general-purpose (7B)
+cdc ollama pull codellama    # Code-specialized (7B-34B)
+cdc ollama pull mixtral      # Powerful reasoning (8x7B)
+
+# List available models
+cdc ollama list
+# ┌──────────────┬─────────────────┬─────────┬──────────┬─────────────────┐
+# │ Model        │ Display Name    │ Context │ Cost     │ Capabilities    │
+# │ mistral      │ Mistral 7B      │ 8,192   │ FREE     │ chat, code      │
+# │ codellama    │ Code Llama      │ 16,384  │ FREE     │ code, chat      │
+# │ mixtral      │ Mixtral 8x7B    │ 32,768  │ FREE     │ chat, analysis  │
+# └──────────────┴─────────────────┴─────────┴──────────┴─────────────────┘
+
+# Show model details
+cdc ollama show mistral
+```
+
+**Benefits of Local Models:**
+- ✅ **Zero Cost**: No API fees, unlimited usage
+- ✅ **Privacy**: Data never leaves your machine
+- ✅ **Offline**: Works without internet connection
+- ✅ **Fast**: No API latency (after model loads)
+- ✅ **Control**: Full control over models and data
+
+**Considerations:**
+- ⚠️ Requires decent hardware (8GB+ RAM, GPU recommended)
+- ⚠️ Models need disk space (4-40GB per model)
+- ⚠️ Quality may be lower than GPT-4/Claude Opus
+- ⚠️ Initial model download can take time
+
+**Use Local Models:**
+```bash
+# Use with any command - completely FREE!
+cdc ask "explain async/await"
+cdc ask -m fast-local "quick question"
+cdc generate tests -m code-local mymodule.py
+cdc review -m smart-local src/
+
+# Use specific model directly
+cdc ask -m mistral "your question"
+cdc ask -m codellama "write a function to parse JSON"
+
+# Remote Ollama server
+cdc config add ollama remote --base-url http://server:11434
+cdc ask -a remote "question"
+```
+
+**Available Model Profiles:**
+- `fast-local`: mistral (8k context, fast inference)
+- `smart-local`: mixtral (32k context, powerful)
+- `code-local`: codellama (16k context, code-focused)
 
 ### 2. Basic Usage
 

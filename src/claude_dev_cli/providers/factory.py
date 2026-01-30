@@ -13,6 +13,14 @@ except (ImportError, RuntimeError):
     OpenAIProvider = None  # type: ignore
     OPENAI_PROVIDER_AVAILABLE = False
 
+# Try to import Ollama provider, graceful fallback if not installed
+try:
+    from claude_dev_cli.providers.ollama import OllamaProvider
+    OLLAMA_PROVIDER_AVAILABLE = True
+except (ImportError, RuntimeError):
+    OllamaProvider = None  # type: ignore
+    OLLAMA_PROVIDER_AVAILABLE = False
+
 
 class ProviderFactory:
     """Factory for creating AI provider instances based on configuration."""
@@ -29,8 +37,11 @@ class ProviderFactory:
         if OPENAI_PROVIDER_AVAILABLE and OpenAIProvider:
             registry["openai"] = OpenAIProvider
         
+        # Add Ollama if available
+        if OLLAMA_PROVIDER_AVAILABLE and OllamaProvider:
+            registry["ollama"] = OllamaProvider
+        
         # Future providers:
-        # "ollama": OllamaProvider,      # v0.16.0
         # "lmstudio": LMStudioProvider,  # v0.16.0
         
         return registry

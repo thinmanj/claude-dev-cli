@@ -9,7 +9,7 @@ Features:
 - Interactive and single-shot modes
 """
 
-__version__ = "0.13.3"
+__version__ = "0.16.0"
 __author__ = "Julio"
 __license__ = "MIT"
 

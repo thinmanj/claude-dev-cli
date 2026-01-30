@@ -479,12 +479,12 @@ def config() -> None:
 
 
 @config.command('add')
-@click.argument('provider', type=click.Choice(['anthropic', 'openai'], case_sensitive=False), default='anthropic')
+@click.argument('provider', type=click.Choice(['anthropic', 'openai', 'ollama'], case_sensitive=False), default='anthropic')
 @click.argument('name')
-@click.option('--api-key', help='API key (or set {NAME}_<PROVIDER>_API_KEY env var)')
+@click.option('--api-key', help='API key (or set {NAME}_<PROVIDER>_API_KEY env var; not needed for ollama)')
 @click.option('--description', help='Description of this API config')
 @click.option('--default', is_flag=True, help='Set as default API config')
-@click.option('--base-url', help='Custom API base URL (for Azure, proxies, etc.)')
+@click.option('--base-url', help='Custom API base URL (for Azure, proxies, or local Ollama server)')
 @click.pass_context
 def config_add(
     ctx: click.Context,
@@ -497,13 +497,14 @@ def config_add(
 ) -> None:
     """Add a new provider configuration.
     
-    PROVIDER: Provider type (anthropic or openai)
+    PROVIDER: Provider type (anthropic, openai, or ollama)
     NAME: Configuration name
     
     Examples:
       cdc config add anthropic personal --default
       cdc config add openai work-openai --api-key sk-...
-      cdc config add openai azure-openai --base-url https://...openai.azure.com
+      cdc config add ollama local --default
+      cdc config add ollama remote --base-url http://server:11434
     """
     console = ctx.obj['console']
     
@@ -515,12 +516,14 @@ def config_add(
             console.print(f"[red]Error: {provider} provider not available[/red]")
             if provider == 'openai':
                 console.print("Install with: pip install 'claude-dev-cli[openai]'")
+            elif provider == 'ollama':
+                console.print("Install with: pip install 'claude-dev-cli[ollama]'")
             sys.exit(1)
         
         config = Config()
         
-        # Get API key from environment if not provided
-        if api_key is None:
+        # Get API key from environment if not provided (skip for ollama)
+        if api_key is None and provider not in ['ollama']:
             env_var = f"{name.upper()}_{provider.upper()}_API_KEY"
             api_key = os.environ.get(env_var)
             if not api_key:
@@ -538,8 +541,9 @@ def config_add(
             if cfg["name"] == name:
                 raise ValueError(f"Config with name '{name}' already exists")
         
-        # Store API key in secure storage
-        config.secure_storage.store_key(name, api_key)
+        # Store API key in secure storage (if provided)
+        if api_key:
+            config.secure_storage.store_key(name, api_key)
         
         # If this is the first config or make_default is True, set as default
         if default or not api_configs:
@@ -551,7 +555,7 @@ def config_add(
         provider_config = ProviderConfig(
             name=name,
             provider=provider,
-            api_key="",  # Empty string indicates key is in secure storage
+            api_key="",  # Empty string indicates key is in secure storage (or not needed)
             base_url=base_url,
             description=description,
             default=default or not api_configs
@@ -563,12 +567,15 @@ def config_add(
         
         console.print(f"[green]✓[/green] Added {provider} config: {name}")
         
-        # Show storage method
-        storage_method = config.secure_storage.get_storage_method()
-        if storage_method == "keyring":
-            console.print("[dim]🔐 Stored securely in system keyring[/dim]")
+        # Show storage method (if API key was stored)
+        if api_key:
+            storage_method = config.secure_storage.get_storage_method()
+            if storage_method == "keyring":
+                console.print("[dim]🔐 Stored securely in system keyring[/dim]")
+            else:
+                console.print("[dim]🔒 Stored in encrypted file (keyring unavailable)[/dim]")
         else:
-            console.print("[dim]🔒 Stored in encrypted file (keyring unavailable)[/dim]")
+            console.print("[dim]ℹ️  No API key needed for local provider[/dim]")
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
@@ -2496,6 +2503,157 @@ def template_use(ctx: click.Context, name: str, api: Optional[str], model: Optio
     
     except Exception as e:
         console.print(f"\n[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
+def ollama() -> None:
+    """Manage Ollama local models."""
+    pass
+
+
+@ollama.command('list')
+@click.option('-a', '--api', help='Ollama config to use (default: local ollama)')
+@click.pass_context
+def ollama_list(ctx: click.Context, api: Optional[str]) -> None:
+    """List available Ollama models."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.providers.ollama import OllamaProvider
+        from claude_dev_cli.providers.base import ProviderConnectionError
+        from claude_dev_cli.config import Config, ProviderConfig
+        from rich.table import Table
+        
+        # Get config or use default local
+        config = Config()
+        provider_config = None
+        if api:
+            api_config = config.get_provider_config(api)
+            if not api_config or api_config.provider != 'ollama':
+                console.print(f"[red]Error: '{api}' is not an ollama config[/red]")
+                sys.exit(1)
+            provider_config = api_config
+        else:
+            # Use default local ollama
+            provider_config = ProviderConfig(
+                name="local",
+                provider="ollama",
+                base_url="http://localhost:11434"
+            )
+        
+        provider = OllamaProvider(provider_config)
+        
+        with console.status("[bold blue]Fetching models from Ollama..."):
+            models = provider.list_models()
+        
+        if not models:
+            console.print("[yellow]No models found.[/yellow]")
+            console.print("\nPull a model with: ollama pull mistral")
+            console.print("Or use: cdc ollama pull mistral")
+            return
+        
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Model", style="cyan")
+        table.add_column("Display Name")
+        table.add_column("Context", justify="right")
+        table.add_column("Cost", justify="right")
+        table.add_column("Capabilities")
+        
+        for model in models:
+            capabilities = ", ".join(model.capabilities)
+            table.add_row(
+                model.model_id,
+                model.display_name,
+                f"{model.context_window:,}",
+                "[green]FREE[/green]",
+                capabilities
+            )
+        
+        console.print(table)
+        console.print(f"\n[dim]Found {len(models)} model(s)[/dim]")
+        
+    except ProviderConnectionError:
+        console.print("[red]Error: Cannot connect to Ollama[/red]")
+        console.print("\nMake sure Ollama is running:")
+        console.print("  ollama serve")
+        console.print("\nOr install Ollama from: https://ollama.ai")
+        sys.exit(1)
+    except ImportError:
+        console.print("[red]Error: Ollama provider not installed[/red]")
+        console.print("Install with: pip install 'claude-dev-cli[ollama]'")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@ollama.command('pull')
+@click.argument('model')
+@click.pass_context
+def ollama_pull(ctx: click.Context, model: str) -> None:
+    """Pull an Ollama model.
+    
+    Examples:
+      cdc ollama pull mistral
+      cdc ollama pull codellama
+      cdc ollama pull mixtral
+    """
+    console = ctx.obj['console']
+    
+    console.print(f"[yellow]Pulling {model} via Ollama CLI...[/yellow]")
+    console.print("[dim]This will use the 'ollama pull' command directly[/dim]\n")
+    
+    import subprocess
+    try:
+        # Use ollama CLI directly - it shows progress
+        result = subprocess.run(
+            ['ollama', 'pull', model],
+            check=True
+        )
+        
+        if result.returncode == 0:
+            console.print(f"\n[green]✓[/green] Successfully pulled {model}")
+            console.print(f"\nUse it with: cdc ask -m {model} 'your question'")
+    except FileNotFoundError:
+        console.print("[red]Error: ollama command not found[/red]")
+        console.print("\nInstall Ollama from: https://ollama.ai")
+        sys.exit(1)
+    except subprocess.CalledProcessError:
+        console.print(f"[red]Error: Failed to pull {model}[/red]")
+        sys.exit(1)
+
+
+@ollama.command('show')
+@click.argument('model')
+@click.pass_context
+def ollama_show(ctx: click.Context, model: str) -> None:
+    """Show details about an Ollama model.
+    
+    Examples:
+      cdc ollama show mistral
+      cdc ollama show codellama
+    """
+    console = ctx.obj['console']
+    
+    import subprocess
+    try:
+        # Use ollama CLI for detailed info
+        result = subprocess.run(
+            ['ollama', 'show', model],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        console.print(result.stdout)
+    except FileNotFoundError:
+        console.print("[red]Error: ollama command not found[/red]")
+        console.print("\nInstall Ollama from: https://ollama.ai")
+        sys.exit(1)
+    except subprocess.CalledProcessError:
+        console.print(f"[red]Error: Model '{model}' not found[/red]")
+        console.print(f"\nPull it first: cdc ollama pull {model}")
         sys.exit(1)
 
 

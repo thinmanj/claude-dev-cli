@@ -7,6 +7,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-01-30
+
+### Added
+- **Ollama Provider**: Zero-cost local AI with Ollama integration
+  - Run models locally: Mistral, Mixtral, Code Llama, DeepSeek Coder, and more
+  - No API keys required - runs on your machine
+  - Free inference with full privacy
+  - Install with: `pip install 'claude-dev-cli[ollama]'`
+
+### Model Profiles
+- **Local Profiles**: Added 3 zero-cost model profiles
+  - `fast-local`: mistral (8k context, fast inference)
+  - `smart-local`: mixtral (32k context, powerful reasoning)
+  - `code-local`: codellama (16k context, specialized for code)
+- All profiles are FREE (zero cost per token)
+
+### CLI Enhancements
+- **Ollama Provider Support**: Enhanced `cdc config add` command
+  - New provider type: `ollama`
+  - No API key required for local providers
+  - Optional `--base-url` for remote Ollama servers
+  - Example: `cdc config add ollama local --default`
+- **Ollama Model Management**: New `cdc ollama` command group
+  - `cdc ollama list`: List available local models
+  - `cdc ollama pull <model>`: Pull models from Ollama registry
+  - `cdc ollama show <model>`: Show model details
+  - Integrates with Ollama CLI for model management
+
+### Usage Examples
+```bash
+# Setup Ollama (one-time)
+# Install from: https://ollama.ai
+# Start server: ollama serve
+
+# Configure local provider
+cdc config add ollama local --default
+
+# Pull models
+cdc ollama pull mistral
+cdc ollama pull codellama
+cdc ollama pull mixtral
+
+# List available models
+cdc ollama list
+
+# Use local models - FREE!
+cdc ask "explain async/await"
+cdc ask -m fast-local "quick question"
+cdc generate tests -m code-local
+cdc review -m smart-local src/
+
+# Use with specific model
+cdc ask -m mistral "your question"
+cdc ask -m codellama "write a function to..."
+
+# Remote Ollama server
+cdc config add ollama remote --base-url http://server:11434
+cdc ask -a remote "question"
+```
+
+### Technical Details
+- **Provider Implementation**: Complete OllamaProvider class (283 lines)
+  - HTTP client for Ollama API (localhost:11434)
+  - Chat completions endpoint: `/api/chat`
+  - Model listing endpoint: `/api/tags`
+  - Full streaming support
+  - Zero-cost tracking (all costs = $0.00)
+  - Token counting from Ollama responses
+  - 120s timeout for slower local inference
+- **Error Handling**: Comprehensive error messages
+  - Connection errors with "ollama serve" hint
+  - Model not found with "ollama pull" hint
+  - Timeout handling for large models
+  - Graceful degradation if requests not installed
+- **Known Models**: Built-in metadata for common models
+  - mistral, llama2, codellama, phi, deepseek-coder, mixtral
+  - Display names, context windows, capabilities
+  - Automatic detection from Ollama API
+
+### Dependencies
+- Added `requests>=2.31.0` for Ollama HTTP client
+- New install options:
+  - `pip install 'claude-dev-cli[ollama]'` - Ollama support
+  - `pip install 'claude-dev-cli[local]'` - All local providers
+  - `pip install 'claude-dev-cli[all-providers]'` - Everything
+
+### Backward Compatibility
+- All existing configurations work unchanged
+- Anthropic and OpenAI remain fully functional
+- No breaking changes to CLI or API
+- Optional dependency - gracefully falls back if not installed
+
+### Cost Comparison
+| Provider | Fast Model | Smart Model | Powerful Model | Cost per 1M tokens |
+|----------|------------|-------------|----------------|--------------------|
+| **Ollama** | mistral | mixtral | codellama | **$0 (FREE)** |
+| Anthropic | Haiku | Sonnet | Opus | $0.80-$75 |
+| OpenAI | GPT-3.5 | GPT-4 Turbo | GPT-4 | $0.50-$60 |
+
+### Benefits of Local Models
+- ✅ **Zero Cost**: No API fees, unlimited usage
+- ✅ **Privacy**: Data never leaves your machine
+- ✅ **Offline**: Works without internet
+- ✅ **Speed**: No API latency (after model loads)
+- ✅ **Control**: Full control over model and data
+- ⚠️ **Hardware**: Requires capable GPU/CPU and disk space
+- ⚠️ **Quality**: Smaller models less capable than GPT-4/Opus
+
 ## [0.15.0] - 2026-01-30
 
 ### Added

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-dev-cli"
-version = "0.13.3"
+version = "0.16.0"
 description = "A powerful CLI tool for developers using Claude AI with multi-API routing, test generation, code review, and usage tracking"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -53,8 +53,15 @@ generation = [
 openai = [
     "openai>=1.0.0",
 ]
+ollama = [
+    "requests>=2.28.0",
+]
+local = [
+    "requests>=2.28.0",
+]
 all-providers = [
     "openai>=1.0.0",
+    "requests>=2.28.0",
 ]
 dev = [
     "pytest>=7.0.0",

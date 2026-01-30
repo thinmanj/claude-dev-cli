@@ -250,6 +250,37 @@ class Config:
                 "provider": "openai",
                 "api_config_name": None
             },
+            # Ollama (Local) profiles - zero cost!
+            {
+                "name": "fast-local",
+                "model_id": "mistral",
+                "description": "Fast local inference with Mistral 7B (zero cost)",
+                "input_price_per_mtok": 0.0,
+                "output_price_per_mtok": 0.0,
+                "use_cases": ["quick", "chat", "general"],
+                "provider": "ollama",
+                "api_config_name": None
+            },
+            {
+                "name": "smart-local",
+                "model_id": "mixtral",
+                "description": "Powerful local inference with Mixtral 8x7B (zero cost)",
+                "input_price_per_mtok": 0.0,
+                "output_price_per_mtok": 0.0,
+                "use_cases": ["general", "analysis", "chat"],
+                "provider": "ollama",
+                "api_config_name": None
+            },
+            {
+                "name": "code-local",
+                "model_id": "codellama",
+                "description": "Code-focused local inference with Code Llama (zero cost)",
+                "input_price_per_mtok": 0.0,
+                "output_price_per_mtok": 0.0,
+                "use_cases": ["coding", "refactoring", "debugging"],
+                "provider": "ollama",
+                "api_config_name": None
+            },
         ]
         
         return profiles
