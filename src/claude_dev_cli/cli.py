@@ -2873,5 +2873,417 @@ def workflow_validate(ctx: click.Context, workflow_file: str) -> None:
         sys.exit(1)
 
 
+# ============================================================================
+# PROJECT MANAGEMENT COMMANDS (v0.17.0)
+# ============================================================================
+
+@main.group()
+def ticket() -> None:
+    """Execute tickets from external systems (repo-tickets, Jira, etc.)."""
+    pass
+
+
+@ticket.command('execute')
+@click.argument('ticket_id')
+@click.option('--backend', type=click.Choice(['repo-tickets', 'markdown']), default='markdown',
+              help='Ticket backend to use')
+@click.option('--notify', is_flag=True, help='Send notifications')
+@click.option('--commit', is_flag=True, help='Auto-commit changes')
+@click.option('-a', '--api', help='API config for AI generation')
+@click.option('-m', '--model', help='Model to use')
+@click.pass_context
+def ticket_execute(
+    ctx: click.Context,
+    ticket_id: str,
+    backend: str,
+    notify: bool,
+    commit: bool,
+    api: Optional[str],
+    model: Optional[str]
+) -> None:
+    """Execute a ticket: fetch → analyze → generate code → tests → commit.
+    
+    Examples:
+        cdc ticket execute TASK-123
+        cdc ticket execute JIRA-456 --backend repo-tickets --commit --notify
+    """
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.project import TicketExecutor
+        from claude_dev_cli.tickets import MarkdownBackend, RepoTicketsBackend
+        from claude_dev_cli.logging import MarkdownLogger
+        from claude_dev_cli.notifications import NtfyNotifier
+        from claude_dev_cli.vcs import GitManager
+        from claude_dev_cli.core import ClaudeClient
+        
+        # Initialize backend
+        if backend == 'repo-tickets':
+            ticket_backend = RepoTicketsBackend()
+        else:
+            ticket_backend = MarkdownBackend()
+        
+        if not ticket_backend.connect():
+            console.print(f"[red]Failed to connect to {backend} backend[/red]")
+            sys.exit(1)
+        
+        # Initialize components
+        logger = MarkdownLogger()
+        logger.init(f"Ticket Execution - {ticket_id}")
+        
+        notifier = NtfyNotifier(topic="cdc-tickets") if notify else None
+        vcs = GitManager() if commit else None
+        
+        ai_client = ClaudeClient(api_config_name=api) if api else None
+        
+        # Create executor
+        executor = TicketExecutor(
+            ticket_backend=ticket_backend,
+            ai_client=ai_client,
+            logger=logger,
+            notifier=notifier,
+            vcs=vcs,
+            auto_commit=commit
+        )
+        
+        console.print(f"[cyan]Executing ticket:[/cyan] {ticket_id}\n")
+        
+        with console.status(f"[bold blue]Processing {ticket_id}..."):
+            success = executor.execute_ticket(ticket_id)
+        
+        if success:
+            console.print(f"\n[green]✅ Ticket {ticket_id} completed successfully![/green]")
+            console.print(f"\n[dim]📊 Check .cdc-logs/progress.md for details[/dim]")
+        else:
+            console.print(f"\n[red]❌ Ticket {ticket_id} execution failed[/red]")
+            sys.exit(1)
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
+def tickets() -> None:
+    """Manage tickets (create, list, update)."""
+    pass
+
+
+@tickets.command('create')
+@click.argument('title')
+@click.option('--description', '-d', help='Ticket description')
+@click.option('--priority', type=click.Choice(['critical', 'high', 'medium', 'low']),
+              default='medium', help='Priority level')
+@click.option('--type', 'ticket_type', type=click.Choice(['feature', 'bug', 'refactor', 'test', 'doc']),
+              default='feature', help='Ticket type')
+@click.option('--backend', type=click.Choice(['repo-tickets', 'markdown']), default='markdown',
+              help='Ticket backend')
+@click.pass_context
+def tickets_create(
+    ctx: click.Context,
+    title: str,
+    description: Optional[str],
+    priority: str,
+    ticket_type: str,
+    backend: str
+) -> None:
+    """Create a new ticket.
+    
+    Examples:
+        cdc tickets create "Add user auth" --priority high
+        cdc tickets create "Fix login bug" --type bug --backend repo-tickets
+    """
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.tickets import MarkdownBackend, RepoTicketsBackend
+        
+        if backend == 'repo-tickets':
+            ticket_backend = RepoTicketsBackend()
+        else:
+            ticket_backend = MarkdownBackend()
+        
+        ticket_backend.connect()
+        
+        ticket = ticket_backend.create_task(
+            story_id=None,
+            title=title,
+            description=description or "",
+            priority=priority,
+            ticket_type=ticket_type
+        )
+        
+        console.print(f"[green]✅ Created ticket:[/green] {ticket.id}")
+        console.print(f"  Title: {ticket.title}")
+        console.print(f"  Priority: {ticket.priority}")
+        console.print(f"  Type: {ticket.ticket_type}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@tickets.command('list')
+@click.option('--status', help='Filter by status')
+@click.option('--backend', type=click.Choice(['repo-tickets', 'markdown']), default='markdown')
+@click.pass_context
+def tickets_list(ctx: click.Context, status: Optional[str], backend: str) -> None:
+    """List tickets."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.tickets import MarkdownBackend, RepoTicketsBackend
+        from rich.table import Table
+        
+        if backend == 'repo-tickets':
+            ticket_backend = RepoTicketsBackend()
+        else:
+            ticket_backend = MarkdownBackend()
+        
+        ticket_backend.connect()
+        tickets = ticket_backend.list_tickets(status=status)
+        
+        if not tickets:
+            console.print("[yellow]No tickets found[/yellow]")
+            return
+        
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("ID", style="cyan")
+        table.add_column("Title")
+        table.add_column("Status", style="yellow")
+        table.add_column("Priority", style="red")
+        table.add_column("Type", style="blue")
+        
+        for ticket in tickets:
+            table.add_row(
+                ticket.id,
+                ticket.title[:50],
+                ticket.status,
+                ticket.priority,
+                ticket.ticket_type
+            )
+        
+        console.print(table)
+        console.print(f"\n[dim]Total: {len(tickets)} ticket(s)[/dim]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
+def bug() -> None:
+    """Report and triage bugs."""
+    pass
+
+
+@bug.command('report')
+@click.option('--title', '-t', required=True, help='Bug title')
+@click.option('--description', '-d', required=True, help='Bug description')
+@click.option('--expected', '-e', required=True, help='Expected behavior')
+@click.option('--actual', '-a', required=True, help='Actual behavior')
+@click.option('--steps', '-s', multiple=True, help='Steps to reproduce')
+@click.option('--environment', help='Environment (production/staging/dev)')
+@click.option('--severity', type=click.Choice(['critical', 'high', 'medium', 'low', 'trivial']),
+              help='Override auto-triage severity')
+@click.option('--no-triage', is_flag=True, help='Skip auto-triage')
+@click.option('--backend', type=click.Choice(['repo-tickets', 'markdown']), default='markdown')
+@click.pass_context
+def bug_report(
+    ctx: click.Context,
+    title: str,
+    description: str,
+    expected: str,
+    actual: str,
+    steps: tuple,
+    environment: Optional[str],
+    severity: Optional[str],
+    no_triage: bool,
+    backend: str
+) -> None:
+    """Report a bug with automatic triage.
+    
+    Examples:
+        cdc bug report \\
+          --title "App crashes on startup" \\
+          --description "Application fails to launch" \\
+          --expected "App should start normally" \\
+          --actual "App crashes immediately" \\
+          --steps "Open app" --steps "Wait 2 seconds" \\
+          --environment production
+    """
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.project import BugTriageSystem, BugReport, BugSeverity
+        from claude_dev_cli.tickets import MarkdownBackend, RepoTicketsBackend
+        from claude_dev_cli.notifications import NtfyNotifier
+        
+        if backend == 'repo-tickets':
+            ticket_backend = RepoTicketsBackend()
+        else:
+            ticket_backend = MarkdownBackend()
+        
+        ticket_backend.connect()
+        
+        # Create bug report
+        bug = BugReport(
+            id=None,
+            title=title,
+            description=description,
+            steps_to_reproduce=list(steps) if steps else [],
+            expected_behavior=expected,
+            actual_behavior=actual,
+            environment=environment,
+            severity=BugSeverity(severity) if severity else None
+        )
+        
+        # Initialize triage system
+        triage = BugTriageSystem(
+            ticket_backend=ticket_backend,
+            notifier=NtfyNotifier(topic="cdc-bugs")
+        )
+        
+        console.print(f"[cyan]Submitting bug report:[/cyan] {title}\n")
+        
+        with console.status("[bold blue]Triaging bug...") if not no_triage else console:
+            ticket = triage.submit_bug(bug, auto_triage=not no_triage)
+        
+        console.print(f"\n[green]✅ Bug reported:[/green] {ticket.id}")
+        console.print(f"  Title: {bug.title}")
+        
+        if bug.severity:
+            severity_color = {
+                "critical": "red",
+                "high": "yellow",
+                "medium": "blue",
+                "low": "cyan",
+                "trivial": "dim"
+            }.get(bug.severity.value, "white")
+            console.print(f"  Severity: [{severity_color}]{bug.severity.value.upper()}[/{severity_color}]")
+        
+        if bug.category:
+            console.print(f"  Category: {bug.category.value}")
+        
+        if bug.priority:
+            console.print(f"  Priority: {bug.priority}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
+def log() -> None:
+    """Manage progress logs."""
+    pass
+
+
+@log.command('init')
+@click.argument('project_name')
+@click.pass_context
+def log_init(ctx: click.Context, project_name: str) -> None:
+    """Initialize progress logging."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.logging import MarkdownLogger
+        
+        logger = MarkdownLogger()
+        logger.init(project_name)
+        
+        console.print(f"[green]✅ Initialized logging for:[/green] {project_name}")
+        console.print(f"[dim]Log file: .cdc-logs/progress.md[/dim]")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@log.command('entry')
+@click.argument('message')
+@click.option('--ticket', help='Associated ticket ID')
+@click.option('--level', type=click.Choice(['info', 'success', 'error', 'warning']),
+              default='info', help='Log level')
+@click.pass_context
+def log_entry(
+    ctx: click.Context,
+    message: str,
+    ticket: Optional[str],
+    level: str
+) -> None:
+    """Add a log entry."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.logging import MarkdownLogger
+        
+        logger = MarkdownLogger()
+        logger.log(message, ticket_id=ticket, level=level)
+        
+        console.print(f"[green]✅ Logged:[/green] {message}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@log.command('report')
+@click.pass_context
+def log_report(ctx: click.Context) -> None:
+    """Generate progress report."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.logging import MarkdownLogger
+        
+        logger = MarkdownLogger()
+        report = logger.get_report()
+        
+        md = Markdown(report)
+        console.print(md)
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
+def notify() -> None:
+    """Test notifications."""
+    pass
+
+
+@notify.command('test')
+@click.option('--topic', default='cdc-test', help='Ntfy topic')
+@click.pass_context
+def notify_test(ctx: click.Context, topic: str) -> None:
+    """Send a test notification."""
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.notifications import NtfyNotifier, NotificationPriority
+        
+        notifier = NtfyNotifier(topic=topic)
+        
+        success = notifier.send(
+            title="Test Notification",
+            message="✅ claude-dev-cli notifications are working!",
+            priority=NotificationPriority.NORMAL,
+            tags=["white_check_mark", "test"]
+        )
+        
+        if success:
+            console.print(f"[green]✅ Notification sent![/green]")
+            console.print(f"\n[dim]Check: https://ntfy.sh/{topic}[/dim]")
+        else:
+            console.print("[red]❌ Failed to send notification[/red]")
+            sys.exit(1)
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     main(obj={})
