@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-dev-cli"
-version = "0.16.2"
-description = "A powerful CLI tool for developers using Claude AI with multi-API routing, test generation, code review, and usage tracking"
+version = "0.17.0"
+description = "A powerful CLI tool for developers using Claude AI with multi-API routing, test generation, code review, usage tracking, and project management automation"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -62,6 +62,28 @@ local = [
 all-providers = [
     "openai>=1.0.0",
     "requests>=2.28.0",
+]
+project-mgmt = [
+    "repo-tickets>=0.8.0",
+    "python-docx>=0.8.11",
+]
+notifications = [
+    "requests>=2.28.0",
+    "python-telegram-bot>=20.0",
+]
+vcs = [
+    "GitPython>=3.1.0",
+]
+environment = [
+    "docker>=6.0.0",
+]
+all-pm = [
+    "repo-tickets>=0.8.0",
+    "python-docx>=0.8.11",
+    "requests>=2.28.0",
+    "python-telegram-bot>=20.0",
+    "GitPython>=3.1.0",
+    "docker>=6.0.0",
 ]
 dev = [
     "pytest>=7.0.0",
