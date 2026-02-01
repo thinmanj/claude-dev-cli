@@ -7,9 +7,88 @@
 [![Homebrew](https://img.shields.io/badge/homebrew-available-orange.svg)](https://github.com/thinmanj/homebrew-tap)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-A powerful command-line tool for developers using Claude AI with multi-API routing, test generation, code review, and comprehensive usage tracking.
+A powerful command-line tool for developers using Claude AI with multi-API routing, test generation, code review, comprehensive usage tracking, and **AI-powered project automation**.
 
 ## Features
+
+### 🤖 AI-Powered Project Automation (v0.17.0+) ✨ **NEW**
+
+**Transform tickets into working code automatically:**
+
+```bash
+# Execute a ticket end-to-end: fetch → analyze → generate code → tests → commit
+cdc ticket execute TASK-123 --commit --notify
+```
+
+**What happens:**
+1. 📥 Fetches ticket from backend (repo-tickets, Jira, Linear, GitHub Issues)
+2. 🧠 AI analyzes requirements and acceptance criteria
+3. 💻 Generates production-ready implementation code
+4. ✅ Generates comprehensive tests
+5. 📝 Commits to git with conventional format + co-author
+6. 🎫 Updates ticket status to "completed"
+7. 📊 Logs all progress to `.cdc-logs/progress.md`
+8. 🔔 Sends push notifications (FREE via ntfy.sh)
+
+**Ticket Management:**
+```bash
+# Create tickets
+cdc tickets create "Add user authentication" --priority high --type feature
+
+# List tickets
+cdc tickets list --status open
+
+# Multi-backend support
+cdc ticket execute TASK-456 --backend repo-tickets
+```
+
+**AI-Powered Bug Triage:**
+```bash
+# Report bugs with automatic severity/category classification
+cdc bug report \
+  --title "App crashes on startup" \
+  --description "Application fails to launch" \
+  --expected "App should start normally" \
+  --actual "App crashes immediately" \
+  --steps "Open app" --steps "Wait 2 seconds" \
+  --environment production
+
+# AI automatically assigns:
+# ✅ Severity: CRITICAL (crash detected)
+# ✅ Category: CRASH
+# ✅ Priority: critical
+# ✅ Sends urgent notification
+# ✅ Detects duplicates
+```
+
+**Progress Tracking:**
+```bash
+# Initialize logging
+cdc log init "My Project"
+
+# Add entries
+cdc log entry "Completed auth module" --ticket TASK-123 --level success
+
+# Generate reports
+cdc log report  # Beautiful markdown summary with stats
+```
+
+**Features:**
+- 🎫 **Ticket Backends**: repo-tickets, Jira, Linear, GitHub Issues, Markdown (fallback)
+- 🤖 **Full AI Automation**: Requirements → Code → Tests → Commit → Deploy
+- 🐛 **Smart Bug Triage**: AI classifies severity, category, priority
+- 📊 **Progress Logging**: Markdown-based tracking with artifact linking
+- 🔔 **Notifications**: FREE push notifications via ntfy.sh (no signup!)
+- 🔄 **VCS Integration**: Git commits with co-author attribution
+- 📝 **Structured Data**: BDD scenarios, acceptance criteria, stack traces
+- 🔍 **Duplicate Detection**: Find similar bugs automatically
+- ⚡ **Cost Optimization**: Use FREE local AI (Ollama) for code generation
+
+**Install with project management:**
+```bash
+pip install 'claude-dev-cli[all-pm]'  # All project management features
+pip install 'claude-dev-cli[project-mgmt]'  # Ticket management only
+```
 
 ### 🌐 Multi-Provider AI Support (v0.14.0+)
 - **Anthropic (Claude)**: GPT-4 class models with 200k context
@@ -201,6 +280,30 @@ pip install 'claude-dev-cli[toon]'
 Adds:
 - `toon-format>=0.1.0` - TOON encoding/decoding
 
+**Project Management** (v0.17.0+ - ticket automation, bug triage):
+
+```bash
+# Core project management (tickets, logging)
+pip install 'claude-dev-cli[project-mgmt]'
+
+# With notifications
+pip install 'claude-dev-cli[notifications]'
+
+# With VCS integration
+pip install 'claude-dev-cli[vcs]'
+
+# All project management features
+pip install 'claude-dev-cli[all-pm]'
+```
+
+Adds:
+- `repo-tickets>=0.8.0` - Ticket management backend
+- `python-docx>=0.8.11` - Document processing
+- `requests>=2.28.0` - HTTP client for notifications
+- `python-telegram-bot>=20.0` - Telegram notifications (optional)
+- `GitPython>=3.1.0` - Git integration
+- `docker>=6.0.0` - Docker environment support
+
 **Syntax Highlighting** (enhanced diff display):
 
 ```bash
@@ -213,7 +316,7 @@ Adds:
 **All Optional Features**:
 
 ```bash
-pip install 'claude-dev-cli[generation,toon,plugins]'
+pip install 'claude-dev-cli[generation,toon,plugins,all-pm]'
 ```
 
 **Development Installation** (for contributors):
@@ -1211,6 +1314,193 @@ cdc generate tests client_code.py -a client
 # Check usage per API
 cdc usage --api personal
 cdc usage --api client
+```
+
+### Project Management & Automation (v0.17.0+)
+
+#### Automated Ticket Execution
+
+```bash
+# Create a ticket
+cdc tickets create "Implement user authentication API" \
+  --description "JWT-based auth with email/password" \
+  --priority high \
+  --type feature
+
+# Output: Created ticket: TASK-A1B2C3D4
+
+# Execute the ticket with full AI automation
+cdc ticket execute TASK-A1B2C3D4 --commit --notify
+
+# What happens:
+# 1. 📥 Fetches ticket and analyzes requirements
+# 2. 🧠 AI generates implementation plan
+# 3. 💻 Generates api/auth.py with login endpoint
+# 4. ✅ Generates tests/test_auth.py with all acceptance criteria
+# 5. 📝 Commits: "feat(TASK-A1B2C3D4): Implement user authentication API"
+# 6. 🎫 Updates ticket status to "completed"
+# 7. 📊 Logs to .cdc-logs/progress.md
+# 8. 🔔 Sends push notification
+
+# Review progress
+cdc log report
+```
+
+#### Bug Reporting with AI Triage
+
+```bash
+# Report a bug - AI automatically classifies it
+cdc bug report \
+  --title "App crashes when email contains + character" \
+  --description "Users with + in email address cannot login" \
+  --expected "All valid email addresses should work" \
+  --actual "Server returns 500 error for emails with +" \
+  --steps "Enter email test+user@example.com" \
+  --steps "Click login" \
+  --steps "App crashes" \
+  --environment production
+
+# AI automatically:
+# ✅ Severity: HIGH (functionality broken)
+# ✅ Category: FUNCTIONALITY
+# ✅ Priority: high
+# ✅ Creates ticket: BUG-XYZ123
+# ✅ Checks for duplicates
+# ✅ Sends notification if critical
+
+# List all bugs
+cdc tickets list --status open
+
+# Execute bug fix
+cdc ticket execute BUG-XYZ123 --commit
+```
+
+#### Progress Tracking
+
+```bash
+# Initialize logging for a project
+cdc log init "E-Commerce Platform"
+
+# Add manual log entries
+cdc log entry "Started authentication module" --level info
+cdc log entry "Completed user registration" --ticket TASK-123 --level success
+cdc log entry "Found issue with password validation" --level warning
+
+# Generate full progress report
+cdc log report
+
+# Output:
+# # Progress Summary
+# 
+# **Total Entries:** 15
+# **Successes:** ✅ 8
+# **Errors:** ❌ 1
+# 
+# ## ✅ 2026-02-01 02:30:15
+# **Ticket:** TASK-123
+# Completed user registration
+# ...
+```
+
+#### Using with repo-tickets Backend
+
+```bash
+# Install repo-tickets integration
+pip install 'claude-dev-cli[all-pm]'
+
+# Navigate to your project with repo-tickets
+cd my-project
+tickets init  # Initialize repo-tickets if needed
+
+# Create a ticket in repo-tickets
+tickets create "Add payment gateway integration"
+# Output: Created TICKET-456
+
+# Execute it with AI
+cdc ticket execute TICKET-456 --backend repo-tickets --commit --notify
+
+# AI will:
+# - Fetch ticket from repo-tickets
+# - Generate payment gateway code
+# - Generate tests
+# - Update repo-tickets status
+# - Commit to your repo
+```
+
+#### Cost Optimization with Local AI
+
+```bash
+# Use FREE local AI (Ollama) for code generation
+# Install Ollama first: https://ollama.ai
+
+# Pull a code model
+cdc ollama pull codellama
+
+# Execute ticket with local AI (zero cost!)
+cdc ticket execute TASK-789 --api local --commit
+
+# Result: Code generated with $0.00 cost!
+```
+
+#### Notifications Setup
+
+```bash
+# Test notifications (uses ntfy.sh - FREE, no signup!)
+cdc notify test --topic my-project
+
+# Check your phone or browser at: https://ntfy.sh/my-project
+# You'll see: "✅ claude-dev-cli notifications are working!"
+
+# All ticket executions can send notifications:
+cdc ticket execute TASK-999 --commit --notify
+
+# Critical bugs auto-notify:
+cdc bug report --title "Database connection fails" \
+  --description "Cannot connect to production DB" \
+  --expected "Should connect" \
+  --actual "Connection timeout" \
+  --environment production
+# 🚨 Sends URGENT notification automatically
+```
+
+#### Complete Workflow Example
+
+```bash
+# 1. Setup
+pip install 'claude-dev-cli[all-pm]'
+cdc log init "My Awesome Project"
+
+# 2. Create tickets for your sprint
+cdc tickets create "User registration" --priority high
+cdc tickets create "User login" --priority high
+cdc tickets create "Password reset" --priority medium
+cdc tickets create "Email verification" --priority low
+
+# 3. Execute tickets one by one
+cdc ticket execute TASK-001 --commit --notify
+cdc ticket execute TASK-002 --commit --notify
+
+# 4. Bug is reported
+cdc bug report \
+  --title "Registration fails for Gmail users" \
+  --description "Gmail addresses rejected" \
+  --expected "Should accept all emails" \
+  --actual "Validation error"
+
+# 5. Fix the bug
+cdc ticket execute BUG-001 --commit --notify
+
+# 6. Review progress
+cdc log report
+cdc tickets list
+
+# 7. All done! 🎉
+# - Code generated
+# - Tests written
+# - Tickets updated
+# - Commits made
+# - Team notified
+# - Progress logged
 ```
 
 ## Environment Variables
