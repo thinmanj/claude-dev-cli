@@ -34,9 +34,22 @@ console = Console()
 @click.version_option(version=__version__)
 @click.pass_context
 def main(ctx: click.Context) -> None:
-    """Claude Dev CLI - AI-powered development assistant with multi-API routing."""
+    """Claude Dev CLI - AI-powered development assistant with multi-API routing.
+    
+    ⚠️  NOTICE: This project is being renamed to 'devflow' in v0.20.0.
+    Run 'cdc --version' for details.
+    """
     ctx.ensure_object(dict)
     ctx.obj['console'] = console
+    
+    # Show deprecation warning on first run or periodically
+    # Only show for interactive commands, not for --version or --help
+    if ctx.invoked_subcommand and ctx.invoked_subcommand not in ['version']:
+        from claude_dev_cli.deprecation import show_deprecation_warning
+        # Show full warning once per session (or until acknowledged)
+        if os.environ.get('_CDC_DEPRECATION_SHOWN') != '1':
+            show_deprecation_warning(console)
+            os.environ['_CDC_DEPRECATION_SHOWN'] = '1'
 
 
 # Load plugins after main group is defined

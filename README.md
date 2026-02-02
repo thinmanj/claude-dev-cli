@@ -1,8 +1,11 @@
 # Claude Dev CLI
 
+> ⚠️ **NOTICE**: This project is being renamed to **devflow** in v0.20.0!  
+> The `cdc` command will continue to work. [Migration Guide](MIGRATION.md) | [Rename Details](RENAME.md)
+
 [![PyPI version](https://badge.fury.io/py/claude-dev-cli.svg)](https://badge.fury.io/py/claude-dev-cli)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-303%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
+[![Tests](https://img.shields.io/badge/tests-333%20passing-brightgreen.svg)](https://github.com/thinmanj/claude-dev-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Homebrew](https://img.shields.io/badge/homebrew-available-orange.svg)](https://github.com/thinmanj/homebrew-tap)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
