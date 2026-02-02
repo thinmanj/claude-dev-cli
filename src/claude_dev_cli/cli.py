@@ -3261,6 +3261,185 @@ def log_report(ctx: click.Context) -> None:
 
 
 @main.group()
+def project() -> None:
+    """Project configuration and execution."""
+    pass
+
+
+@project.command('init')
+@click.argument('project_name')
+@click.option('--commit-strategy', type=click.Choice(['single', 'atomic', 'feature', 'disabled']),
+              default='single', help='Commit strategy')
+@click.option('--branch-strategy', type=click.Choice(['main', 'ticket', 'feature', 'disabled']),
+              default='main', help='Branch strategy')
+@click.option('--environment', type=click.Choice(['development', 'staging', 'production', 'local']),
+              default='development', help='Execution environment')
+@click.option('--auto-commit', is_flag=True, help='Enable auto-commit')
+@click.option('--auto-push', is_flag=True, help='Enable auto-push')
+@click.option('--gather-context/--no-context', default=True, help='Enable context gathering')
+@click.option('--notifications', is_flag=True, help='Enable notifications')
+@click.option('--backend', type=click.Choice(['repo-tickets', 'markdown']), default='markdown',
+              help='Ticket backend')
+@click.pass_context
+def project_init(
+    ctx: click.Context,
+    project_name: str,
+    commit_strategy: str,
+    branch_strategy: str,
+    environment: str,
+    auto_commit: bool,
+    auto_push: bool,
+    gather_context: bool,
+    notifications: bool,
+    backend: str
+) -> None:
+    """Initialize project configuration.
+    
+    Creates .cdc-project.json with project settings for automated ticket execution.
+    
+    Examples:
+        cdc project init "My Project" --auto-commit --notifications
+        cdc project init "API Service" --commit-strategy atomic --backend repo-tickets
+    """
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.project import ProjectConfigManager, CommitStrategy, BranchStrategy, Environment
+        from pathlib import Path
+        
+        config = ProjectConfigManager.init(
+            project_name=project_name,
+            project_root=Path.cwd(),
+            commit_strategy=CommitStrategy(commit_strategy),
+            branch_strategy=BranchStrategy(branch_strategy),
+            environment=Environment(environment),
+            auto_commit=auto_commit,
+            auto_push=auto_push,
+            gather_context=gather_context,
+            enable_notifications=notifications,
+            ticket_backend=backend
+        )
+        
+        config.save()
+        
+        console.print(f"[green]✅ Initialized project:[/green] {project_name}")
+        console.print(f"[dim]Config file: .cdc-project.json[/dim]\n")
+        
+        # Show settings
+        console.print("[cyan]Settings:[/cyan]")
+        console.print(f"  Commit Strategy: {config.commit_strategy.value}")
+        console.print(f"  Branch Strategy: {config.branch_strategy.value}")
+        console.print(f"  Environment: {config.environment.value}")
+        console.print(f"  Auto-commit: {config.auto_commit}")
+        console.print(f"  Auto-push: {config.auto_push}")
+        console.print(f"  Context Gathering: {config.gather_context}")
+        console.print(f"  Notifications: {config.enable_notifications}")
+        console.print(f"  Ticket Backend: {config.ticket_backend}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@project.command('config')
+@click.option('--show', is_flag=True, help='Show current configuration')
+@click.option('--commit-strategy', type=click.Choice(['single', 'atomic', 'feature', 'disabled']),
+              help='Update commit strategy')
+@click.option('--branch-strategy', type=click.Choice(['main', 'ticket', 'feature', 'disabled']),
+              help='Update branch strategy')
+@click.option('--environment', type=click.Choice(['development', 'staging', 'production', 'local']),
+              help='Update environment')
+@click.option('--auto-commit/--no-auto-commit', default=None, help='Toggle auto-commit')
+@click.option('--auto-push/--no-auto-push', default=None, help='Toggle auto-push')
+@click.option('--gather-context/--no-context', default=None, help='Toggle context gathering')
+@click.option('--notifications/--no-notifications', default=None, help='Toggle notifications')
+@click.pass_context
+def project_config(
+    ctx: click.Context,
+    show: bool,
+    commit_strategy: Optional[str],
+    branch_strategy: Optional[str],
+    environment: Optional[str],
+    auto_commit: Optional[bool],
+    auto_push: Optional[bool],
+    gather_context: Optional[bool],
+    notifications: Optional[bool]
+) -> None:
+    """View or update project configuration.
+    
+    Examples:
+        cdc project config --show
+        cdc project config --auto-commit
+        cdc project config --commit-strategy atomic --environment staging
+    """
+    console = ctx.obj['console']
+    
+    try:
+        from claude_dev_cli.project import ProjectConfig, ProjectConfigManager
+        from rich.table import Table
+        
+        config = ProjectConfig.load()
+        
+        if config is None:
+            console.print("[yellow]No project configuration found.[/yellow]")
+            console.print("[dim]Run 'cdc project init <name>' to create one.[/dim]")
+            sys.exit(1)
+        
+        # Show current config
+        if show or not any([commit_strategy, branch_strategy, environment,
+                           auto_commit is not None, auto_push is not None,
+                           gather_context is not None, notifications is not None]):
+            console.print(f"[cyan]Project:[/cyan] {config.project_name}\n")
+            
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("Setting", style="cyan")
+            table.add_column("Value")
+            
+            table.add_row("Commit Strategy", config.commit_strategy.value)
+            table.add_row("Branch Strategy", config.branch_strategy.value)
+            table.add_row("Environment", config.environment.value)
+            table.add_row("Auto-commit", str(config.auto_commit))
+            table.add_row("Auto-push", str(config.auto_push))
+            table.add_row("Context Gathering", str(config.gather_context))
+            table.add_row("Notifications", str(config.enable_notifications))
+            table.add_row("Ticket Backend", config.ticket_backend)
+            
+            console.print(table)
+            console.print(f"\n[dim]Config file: {config.project_root}/.cdc-project.json[/dim]")
+            return
+        
+        # Update config
+        updates = {}
+        if commit_strategy:
+            updates['commit_strategy'] = commit_strategy
+        if branch_strategy:
+            updates['branch_strategy'] = branch_strategy
+        if environment:
+            updates['environment'] = environment
+        if auto_commit is not None:
+            updates['auto_commit'] = auto_commit
+        if auto_push is not None:
+            updates['auto_push'] = auto_push
+        if gather_context is not None:
+            updates['gather_context'] = gather_context
+        if notifications is not None:
+            updates['enable_notifications'] = notifications
+        
+        config = ProjectConfigManager.update(config, **updates)
+        config.save()
+        
+        console.print("[green]✅ Configuration updated[/green]")
+        
+        # Show what changed
+        for key, value in updates.items():
+            console.print(f"  {key}: {value}")
+    
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.group()
 def notify() -> None:
     """Test notifications."""
     pass
