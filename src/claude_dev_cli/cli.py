@@ -2889,6 +2889,7 @@ def ticket() -> None:
               help='Ticket backend to use')
 @click.option('--notify', is_flag=True, help='Send notifications')
 @click.option('--commit', is_flag=True, help='Auto-commit changes')
+@click.option('--no-context', is_flag=True, help='Skip codebase context gathering')
 @click.option('-a', '--api', help='API config for AI generation')
 @click.option('-m', '--model', help='Model to use')
 @click.pass_context
@@ -2898,14 +2899,19 @@ def ticket_execute(
     backend: str,
     notify: bool,
     commit: bool,
+    no_context: bool,
     api: Optional[str],
     model: Optional[str]
 ) -> None:
     """Execute a ticket: fetch → analyze → generate code → tests → commit.
     
+    By default, gathers codebase context (dependencies, frameworks, similar code)
+    before generating code. Use --no-context to skip this step for faster execution.
+    
     Examples:
         cdc ticket execute TASK-123
         cdc ticket execute JIRA-456 --backend repo-tickets --commit --notify
+        cdc ticket execute TASK-789 --no-context  # Skip context gathering
     """
     console = ctx.obj['console']
     
@@ -2943,10 +2949,16 @@ def ticket_execute(
             logger=logger,
             notifier=notifier,
             vcs=vcs,
-            auto_commit=commit
+            auto_commit=commit,
+            gather_context=not no_context  # Gather context unless --no-context flag is set
         )
         
-        console.print(f"[cyan]Executing ticket:[/cyan] {ticket_id}\n")
+        console.print(f"[cyan]Executing ticket:[/cyan] {ticket_id}")
+        if not no_context:
+            console.print("[dim]Context gathering: ENABLED[/dim]")
+        else:
+            console.print("[dim]Context gathering: DISABLED[/dim]")
+        console.print()
         
         with console.status(f"[bold blue]Processing {ticket_id}..."):
             success = executor.execute_ticket(ticket_id)

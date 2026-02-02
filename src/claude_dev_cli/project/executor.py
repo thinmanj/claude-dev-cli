@@ -13,6 +13,7 @@ from claude_dev_cli.core import ClaudeClient
 from claude_dev_cli.logging.logger import ProgressLogger
 from claude_dev_cli.notifications.notifier import Notifier, NotificationPriority
 from claude_dev_cli.vcs.manager import VCSManager
+from claude_dev_cli.project.context_gatherer import TicketContextGatherer, CodeContext
 
 
 class TicketExecutor:
@@ -36,7 +37,9 @@ class TicketExecutor:
         logger: Optional[ProgressLogger] = None,
         notifier: Optional[Notifier] = None,
         vcs: Optional[VCSManager] = None,
-        auto_commit: bool = False
+        auto_commit: bool = False,
+        gather_context: bool = True,
+        project_root: Optional[Path] = None
     ):
         """Initialize ticket executor.
         
@@ -47,6 +50,8 @@ class TicketExecutor:
             notifier: Notification system
             vcs: VCS manager
             auto_commit: Whether to auto-commit changes
+            gather_context: Whether to gather codebase context before execution
+            project_root: Root of the project (default: current directory)
         """
         self.ticket_backend = ticket_backend
         self.ai_client = ai_client or ClaudeClient()
@@ -54,6 +59,8 @@ class TicketExecutor:
         self.notifier = notifier
         self.vcs = vcs
         self.auto_commit = auto_commit
+        self.gather_context = gather_context
+        self.context_gatherer = TicketContextGatherer(project_root) if gather_context else None
     
     def execute_ticket(self, ticket_id: str) -> bool:
         """Execute a single ticket end-to-end.
@@ -76,11 +83,23 @@ class TicketExecutor:
             self._log(f"✅ Fetched ticket: {ticket.title}", ticket_id=ticket_id, level="success")
             self._notify(f"Starting {ticket_id}", f"Task: {ticket.title}")
             
-            # Step 2: Analyze requirements
-            self._log("Analyzing requirements...", ticket_id=ticket_id)
-            requirements_prompt = self._build_requirements_prompt(ticket)
+            # Step 2: Gather codebase context (optional pre-processing)
+            context = None
+            if self.gather_context and self.context_gatherer:
+                self._log("Gathering codebase context...", ticket_id=ticket_id)
+                context = self.context_gatherer.gather_context(ticket, self.ai_client)
+                self._log(
+                    f"✅ Context gathered: {context.language}" + 
+                    (f" ({context.framework})" if context.framework else ""),
+                    ticket_id=ticket_id,
+                    level="success"
+                )
             
-            # Step 3: Generate implementation plan
+            # Step 3: Analyze requirements
+            self._log("Analyzing requirements...", ticket_id=ticket_id)
+            requirements_prompt = self._build_requirements_prompt(ticket, context)
+            
+            # Step 4: Generate implementation plan
             self._log("Generating implementation plan...", ticket_id=ticket_id)
             plan = self.ai_client.call(
                 requirements_prompt,
@@ -89,9 +108,9 @@ class TicketExecutor:
             
             self._log("Implementation plan created", ticket_id=ticket_id, level="success")
             
-            # Step 4: Generate code
+            # Step 5: Generate code
             self._log("Generating code...", ticket_id=ticket_id)
-            code_prompt = self._build_code_generation_prompt(ticket, plan)
+            code_prompt = self._build_code_generation_prompt(ticket, plan, context)
             
             generated_code = self.ai_client.call(
                 code_prompt,
@@ -103,7 +122,7 @@ class TicketExecutor:
             
             self._log(f"Generated {len(code_files)} file(s)", ticket_id=ticket_id, files=list(code_files.keys()))
             
-            # Step 5: Write files
+            # Step 6: Write files
             for file_path, code_content in code_files.items():
                 self._write_file(file_path, code_content)
                 self._log(f"Created {file_path}", ticket_id=ticket_id)
@@ -111,7 +130,7 @@ class TicketExecutor:
                 if self.logger:
                     self.logger.link_artifact(ticket_id, file_path)
             
-            # Step 6: Generate tests
+            # Step 7: Generate tests
             if ticket.acceptance_criteria:
                 self._log("Generating tests...", ticket_id=ticket_id)
                 test_prompt = self._build_test_generation_prompt(ticket, code_files)
@@ -127,7 +146,7 @@ class TicketExecutor:
                     self._write_file(test_file, test_content)
                     self._log(f"Created test: {test_file}", ticket_id=ticket_id)
             
-            # Step 7: Update ticket status
+            # Step 8: Update ticket status
             self._log("Updating ticket status...", ticket_id=ticket_id)
             self.ticket_backend.update_ticket(ticket_id, status="completed")
             
@@ -139,7 +158,7 @@ class TicketExecutor:
                 author="claude-dev-cli"
             )
             
-            # Step 8: Commit changes
+            # Step 9: Commit changes
             if self.auto_commit and self.vcs and self.vcs.is_repository():
                 self._log("Committing changes...", ticket_id=ticket_id)
                 commit_message = f"feat({ticket_id}): {ticket.title}\n\nGenerated by claude-dev-cli"
@@ -151,7 +170,7 @@ class TicketExecutor:
                 
                 self._log(f"Committed: {commit_info.sha[:7]}", ticket_id=ticket_id, level="success")
             
-            # Step 9: Final notification
+            # Step 10: Final notification
             self._log(f"✅ Ticket {ticket_id} completed!", ticket_id=ticket_id, level="success")
             self._notify(
                 f"✅ {ticket_id} Complete",
@@ -170,8 +189,16 @@ class TicketExecutor:
             )
             return False
     
-    def _build_requirements_prompt(self, ticket: Ticket) -> str:
-        """Build prompt for requirements analysis."""
+    def _build_requirements_prompt(self, ticket: Ticket, context: Optional[CodeContext] = None) -> str:
+        """Build prompt for requirements analysis.
+        
+        Args:
+            ticket: Ticket to analyze
+            context: Optional codebase context
+            
+        Returns:
+            Formatted prompt string
+        """
         prompt = f"""Analyze this software development ticket and create an implementation plan.
 
 **Ticket:** {ticket.id}
@@ -193,36 +220,86 @@ class TicketExecutor:
             for criteria in ticket.acceptance_criteria:
                 prompt += f"- {criteria}\n"
         
+        # Add codebase context if available
+        if context:
+            prompt += "\n\n" + "="*50 + "\n"
+            prompt += "# CODEBASE CONTEXT\n"
+            prompt += "="*50 + "\n\n"
+            prompt += context.format_for_prompt()
+            prompt += "\n\n" + "="*50 + "\n\n"
+        
         prompt += "\n\nProvide a detailed implementation plan with:\n"
         prompt += "1. Technical approach\n"
         prompt += "2. Files to create/modify\n"
         prompt += "3. Key functions/classes needed\n"
         prompt += "4. Dependencies required\n"
         
+        if context:
+            prompt += "\n**IMPORTANT:** Follow the existing codebase patterns and conventions shown above.\n"
+        
         return prompt
     
-    def _build_code_generation_prompt(self, ticket: Ticket, plan: str) -> str:
-        """Build prompt for code generation."""
-        return f"""Generate production-ready code based on this ticket and implementation plan.
+    def _build_code_generation_prompt(self, ticket: Ticket, plan: str, context: Optional[CodeContext] = None) -> str:
+        """Build prompt for code generation.
+        
+        Args:
+            ticket: Ticket to implement
+            plan: Implementation plan from previous step
+            context: Optional codebase context
+            
+        Returns:
+            Formatted prompt string
+        """
+        prompt = f"""Generate production-ready code based on this ticket and implementation plan.
 
 **Ticket:** {ticket.id} - {ticket.title}
 
 **Implementation Plan:**
 {plan}
-
-**Requirements:**
+"""
+        
+        # Add context if available
+        if context:
+            prompt += "\n\n" + "="*50 + "\n"
+            prompt += "# EXISTING CODEBASE CONTEXT\n"
+            prompt += "="*50 + "\n\n"
+            
+            if context.similar_files:
+                prompt += "**Similar existing files to reference:**\n"
+                for file_info in context.similar_files[:3]:
+                    prompt += f"- {file_info['path']}: {file_info['purpose']}\n"
+                prompt += "\n"
+            
+            if context.naming_conventions:
+                prompt += "**Project naming conventions:**\n"
+                for type_name, pattern in context.naming_conventions.items():
+                    prompt += f"- {type_name}: {pattern}\n"
+                prompt += "\n"
+            
+            if context.common_imports:
+                prompt += f"**Common imports in this project:** {', '.join(context.common_imports[:10])}\n\n"
+            
+            prompt += "="*50 + "\n\n"
+        
+        prompt += """**Requirements:**
 Generate clean, well-documented, production-quality code. Include:
 - Proper error handling
 - Type hints (if Python)
 - Docstrings/comments
 - Follow best practices
-
-Output the code in markdown code blocks with file names as headers.
+"""
+        
+        if context:
+            prompt += "- **IMPORTANT:** Follow the existing codebase patterns and conventions shown above\n"
+        
+        prompt += """\nOutput the code in markdown code blocks with file names as headers.
 Example:
 ```python path/to/file.py
 # code here
 ```
 """
+        
+        return prompt
     
     def _build_test_generation_prompt(self, ticket: Ticket, code_files: dict) -> str:
         """Build prompt for test generation."""
