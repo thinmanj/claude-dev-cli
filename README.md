@@ -11,7 +11,31 @@ A powerful command-line tool for developers using Claude AI with multi-API routi
 
 ## Features
 
-### 🤖 AI-Powered Project Automation (v0.17.0+) ✨ **NEW**
+### 🧠 Intelligent Context Gathering (v0.18.0+) ✨ **NEW**
+
+**AI learns your codebase patterns before generating code:**
+
+```bash
+# Automatically gathers context (language, framework, conventions, similar code)
+cdc ticket execute TASK-123 --commit --notify
+
+# Skip context gathering for faster execution
+cdc ticket execute TASK-456 --no-context
+```
+
+**What context is gathered:**
+- 🗂️ Language & Framework (Python/Django, JS/React, Go, etc.)
+- 📦 Dependencies (requirements.txt, package.json, go.mod)
+- 📁 Directory Structure (models/, views/, controllers/, tests/)
+- 📝 Naming Conventions (snake_case, camelCase, PascalCase)
+- 🔍 Similar Existing Code (based on ticket keywords)
+- ⚙️ Common Imports & Patterns
+
+**Result:** AI generates code that follows YOUR project's patterns, not generic templates!
+
+See [CONTEXT_INTELLIGENCE.md](CONTEXT_INTELLIGENCE.md) for full details.
+
+### 🤖 AI-Powered Project Automation (v0.17.0+)
 
 **Transform tickets into working code automatically:**
 
