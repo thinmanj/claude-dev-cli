@@ -42,7 +42,8 @@ class APIConfig(BaseModel):
     default: bool = False
     default_model_profile: Optional[str] = None  # Default model profile for this API
     # Added for provider compatibility
-    provider: str = "anthropic"  # Always anthropic for APIConfig
+    provider: str = "anthropic"  # Default provider for backward compatibility
+    base_url: Optional[str] = None  # Custom endpoint URL (for Azure, proxies, or local Ollama)
 
 
 class ProviderConfig(BaseModel):
@@ -375,7 +376,10 @@ class Config:
             name=config_data["name"],
             api_key=api_key,
             description=config_data.get("description"),
-            default=config_data.get("default", False)
+            default=config_data.get("default", False),
+            provider=config_data.get("provider", "anthropic"),
+            base_url=config_data.get("base_url"),
+            default_model_profile=config_data.get("default_model_profile")
         )
     
     def list_api_configs(self) -> List[APIConfig]:
@@ -392,7 +396,10 @@ class Config:
                 name=c["name"],
                 api_key=api_key,
                 description=c.get("description"),
-                default=c.get("default", False)
+                default=c.get("default", False),
+                provider=c.get("provider", "anthropic"),
+                base_url=c.get("base_url"),
+                default_model_profile=c.get("default_model_profile")
             ))
         return configs
     
