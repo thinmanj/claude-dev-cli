@@ -186,3 +186,39 @@ class TestClaudeClient:
             
         assert client.model == "claude-3-5-sonnet-20241022"
         assert client.max_tokens == 4096
+    
+    def test_ollama_provider_integration(self, temp_home: Path) -> None:
+        """Test that Ollama provider is correctly initialized from config."""
+        # Create config with Ollama provider
+        config = Config()
+        config._data["api_configs"].append({
+            "name": "local",
+            "provider": "ollama",
+            "api_key": "",
+            "base_url": "http://localhost:11434",
+            "description": "Local Ollama",
+            "default": True
+        })
+        config._save_config()
+        
+        # Reload config
+        config = Config()
+        
+        # Mock the provider creation
+        with patch("claude_dev_cli.providers.factory.ProviderFactory.create") as mock_factory:
+            mock_provider = Mock()
+            mock_provider.provider_name = "ollama"
+            mock_factory.return_value = mock_provider
+            
+            client = ClaudeClient(config=config)
+            
+            # Verify the correct config was passed
+            assert client.api_config.name == "local"
+            assert client.api_config.provider == "ollama"
+            assert client.api_config.base_url == "http://localhost:11434"
+            
+            # Verify ProviderFactory.create was called with the config
+            mock_factory.assert_called_once()
+            passed_config = mock_factory.call_args[0][0]
+            assert passed_config.provider == "ollama"
+            assert passed_config.base_url == "http://localhost:11434"

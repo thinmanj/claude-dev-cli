@@ -288,3 +288,89 @@ class TestConfig:
         config = Config()
         
         assert config.get_max_tokens() == 4096
+    
+    def test_api_config_with_provider_field(self, temp_home: Path) -> None:
+        """Test that provider field is read correctly from config."""
+        config = Config()
+        
+        # Manually add an Ollama config to the data
+        config._data["api_configs"].append({
+            "name": "local",
+            "provider": "ollama",
+            "api_key": "",
+            "base_url": "http://localhost:11434",
+            "description": "Local Ollama",
+            "default": False,
+            "default_model_profile": "fast-local"
+        })
+        config._save_config()
+        
+        # Reload and verify
+        config = Config()
+        api_config = config.get_api_config("local")
+        
+        assert api_config is not None
+        assert api_config.name == "local"
+        assert api_config.provider == "ollama"
+        assert api_config.base_url == "http://localhost:11434"
+        assert api_config.description == "Local Ollama"
+        assert api_config.default_model_profile == "fast-local"
+    
+    def test_api_config_provider_defaults_to_anthropic(self, temp_home: Path) -> None:
+        """Test that provider defaults to anthropic for legacy configs."""
+        config = Config()
+        
+        # Add config without provider field (legacy format)
+        config._data["api_configs"].append({
+            "name": "legacy",
+            "api_key": "",
+            "description": "Legacy config",
+            "default": False
+        })
+        config._save_config()
+        
+        # Store key in secure storage
+        config.secure_storage.store_key("legacy", "sk-ant-legacy-key")
+        
+        # Reload and verify
+        config = Config()
+        api_config = config.get_api_config("legacy")
+        
+        assert api_config is not None
+        assert api_config.provider == "anthropic"  # Should default
+    
+    def test_list_api_configs_includes_provider(self, temp_home: Path) -> None:
+        """Test that list_api_configs returns provider field."""
+        config = Config()
+        
+        # Add configs with different providers
+        config._data["api_configs"] = [
+            {
+                "name": "anthropic-config",
+                "provider": "anthropic",
+                "api_key": "",
+                "default": True
+            },
+            {
+                "name": "ollama-config",
+                "provider": "ollama",
+                "api_key": "",
+                "base_url": "http://localhost:11434",
+                "default": False
+            }
+        ]
+        config._save_config()
+        
+        # Store keys
+        config.secure_storage.store_key("anthropic-config", "sk-ant-key")
+        
+        # Reload and verify
+        config = Config()
+        configs = config.list_api_configs()
+        
+        assert len(configs) == 2
+        assert configs[0].name == "anthropic-config"
+        assert configs[0].provider == "anthropic"
+        assert configs[1].name == "ollama-config"
+        assert configs[1].provider == "ollama"
+        assert configs[1].base_url == "http://localhost:11434"
