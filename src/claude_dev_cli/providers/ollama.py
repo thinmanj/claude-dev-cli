@@ -82,7 +82,8 @@ class OllamaProvider(AIProvider):
         
         # No API key needed for local!
         self.base_url = getattr(config, 'base_url', None) or "http://localhost:11434"
-        self.timeout = 120  # Local inference can be slow
+        # Get timeout from config, default to 300s (5 min) for local inference which can be slow
+        self.timeout = getattr(config, 'timeout', None) or 300
         self.last_usage: Optional[UsageInfo] = None
     
     def call(

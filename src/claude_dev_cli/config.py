@@ -44,6 +44,7 @@ class APIConfig(BaseModel):
     # Added for provider compatibility
     provider: str = "anthropic"  # Default provider for backward compatibility
     base_url: Optional[str] = None  # Custom endpoint URL (for Azure, proxies, or local Ollama)
+    timeout: Optional[int] = None  # Request timeout in seconds (default varies by provider)
 
 
 class ProviderConfig(BaseModel):
@@ -56,6 +57,7 @@ class ProviderConfig(BaseModel):
     description: Optional[str] = None
     default: bool = False
     default_model_profile: Optional[str] = None
+    timeout: Optional[int] = None  # Request timeout in seconds (default varies by provider)
 
 
 class ModelProfile(BaseModel):
@@ -379,7 +381,8 @@ class Config:
             default=config_data.get("default", False),
             provider=config_data.get("provider", "anthropic"),
             base_url=config_data.get("base_url"),
-            default_model_profile=config_data.get("default_model_profile")
+            default_model_profile=config_data.get("default_model_profile"),
+            timeout=config_data.get("timeout")
         )
     
     def list_api_configs(self) -> List[APIConfig]:
@@ -399,7 +402,8 @@ class Config:
                 default=c.get("default", False),
                 provider=c.get("provider", "anthropic"),
                 base_url=c.get("base_url"),
-                default_model_profile=c.get("default_model_profile")
+                default_model_profile=c.get("default_model_profile"),
+                timeout=c.get("timeout")
             ))
         return configs
     

@@ -498,6 +498,7 @@ def config() -> None:
 @click.option('--description', help='Description of this API config')
 @click.option('--default', is_flag=True, help='Set as default API config')
 @click.option('--base-url', help='Custom API base URL (for Azure, proxies, or local Ollama server)')
+@click.option('--timeout', type=int, help='Request timeout in seconds (useful for slow local models)')
 @click.pass_context
 def config_add(
     ctx: click.Context,
@@ -506,7 +507,8 @@ def config_add(
     api_key: Optional[str],
     description: Optional[str],
     default: bool,
-    base_url: Optional[str]
+    base_url: Optional[str],
+    timeout: Optional[int]
 ) -> None:
     """Add a new provider configuration.
     
@@ -517,7 +519,7 @@ def config_add(
       cdc config add anthropic personal --default
       cdc config add openai work-openai --api-key sk-...
       cdc config add ollama local --default
-      cdc config add ollama remote --base-url http://server:11434
+      cdc config add ollama remote --base-url http://server:11434 --timeout 600
     """
     console = ctx.obj['console']
     
@@ -571,7 +573,8 @@ def config_add(
             api_key="",  # Empty string indicates key is in secure storage (or not needed)
             base_url=base_url,
             description=description,
-            default=default or not api_configs
+            default=default or not api_configs,
+            timeout=timeout
         )
         
         api_configs.append(provider_config.model_dump())
